@@ -8,7 +8,7 @@ from pymongo.collection import Collection
 from pymongo.database import Database
 from pymongo.results import InsertOneResult
 
-from config import Config
+from main import Config
 
 
 class UserModel(BaseModel):
