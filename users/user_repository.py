@@ -7,8 +7,7 @@ from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo.database import Database
 from pymongo.results import InsertOneResult
-
-from main import Config
+from fastapi_exceptions.exceptions import NotAuthenticated
 
 
 class UserModel(BaseModel):
@@ -18,9 +17,9 @@ class UserModel(BaseModel):
 
 
 class UserRepository:
-    def __init__(self, config: Config):
+    def __init__(self, config):
         self.config = config
-        self.client: MongoClient = MongoClient(self.config.mongo_conn)
+        self.client: MongoClient = MongoClient(self.config.MONGO)
         self.db: Database = self.client.route_db
         self.users_collection: Collection = self.client.route_db.users
         logger.info("Inited repo")
@@ -44,7 +43,7 @@ class UserRepository:
         logger.info(f"Create new user {resp}")
         return resp
 
-    def get_user(self, email: str, password: str) -> bool:
+    def get_user(self, email: str, password: str) -> dict:
         """
         Check if password in param equal to password in db for user email
         :param email: str
@@ -55,8 +54,12 @@ class UserRepository:
         user = self.users_collection.find_one({"email": email})
         try:
             if user['password'] == password:
-                return True
-            return False
+                return {
+                    # "_id": str(user['_id']),
+                    "email": user['email'],
+                    # "password": new_user['password'],
+                }
+            raise NotAuthenticated
         except KeyError:
-            return False
+            raise KeyError
 

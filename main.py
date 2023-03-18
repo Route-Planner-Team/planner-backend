@@ -1,14 +1,9 @@
-from fastapi import FastAPI, Header, Request
-from repository.user_repository import UserRepository, UserModel
+from fastapi import FastAPI, Request
+from users.user_repository import UserRepository, UserModel
 from loguru import logger
-import os
-from dotenv import load_dotenv
-
-
-class Config():
-    load_dotenv()
-    mongo_conn: str = os.getenv("MONGO", "")
-
+from config import Config
+from fastapi_exceptions.exceptions import NotAuthenticated
+from users.jwt import JWTAuth
 
 cfg = Config()
 repo = UserRepository(cfg)
@@ -22,32 +17,39 @@ def ping():
 
 @app.post("/auth/sign-up")
 @logger.catch
-def create_user(user: UserModel):
+def create_user(user: UserModel, status_code=201):
     """
     Handler to create user
-    :param user:
-    :return: {"email": ...., "created_at": ...}
     """
 
     s = repo.create_user(user.dict())
-    return {"message": s}
+    s['token'] = JWTAuth.generate_jwt_token(s)
+    return s
 
 
 @app.post("/auth/sign-in")
 @logger.catch
-def login_user(user: UserModel, request: Request):
-    # TODO
-    # try to read token from headers
-    # Can check headers in request.headers
+def login_user(user: UserModel):
+    """
+    Sign-in handler
+    """
     try:
-        auth_header = request.headers['Auth']
-        print(f"Auth header {auth_header}")
+        status = repo.get_user(user.email, user.password)
+        status['token'] = JWTAuth.generate_jwt_token(status)
+        return status
+    except NotAuthenticated:
+        return {"Message": "Auth failed!"}
+
+
+@app.get("/protected")
+@logger.catch
+def protected_handler(request: Request):
+    try:
+        auth_header = request.headers['Authorization']
+        decoded = JWTAuth.authenticate(auth_header)
+        resp = {}
+        resp.update({"Email": decoded['email']})
+        return resp
     except KeyError:
         print("No auth header")
-        pass
-    # if KeyError or don't found or cannot parse read email and password, if token is ok - return updated token
-
-    # if token in headers is empty , warning, can throw KeyError exception
-    # now return only true or false
-    status = repo.get_user(user.email, user.password)
-    return {"Status": status}
+        return {"Error": "No find token in headers"}
