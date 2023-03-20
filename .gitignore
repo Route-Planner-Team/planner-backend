@@ -4,4 +4,5 @@ venv
 venv/
 env/
 .idea
-__pucache__
+__pycache__
+pycache
