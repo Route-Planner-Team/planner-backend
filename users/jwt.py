@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from fastapi.exceptions import HTTPException
 from jwt.exceptions import *
 
-
 class JWTAuth:
     @staticmethod
     def authenticate(headers):
@@ -26,10 +25,11 @@ class JWTAuth:
         except DecodeError:
             raise DecodeError
 
+    # Temporary function for tests, will be deleted
     @staticmethod
-    def generate_jwt_token(payload: dict) -> str:
+    def generate_jwt_token(payload: dict):
         dt = datetime.now() + timedelta(days=1)
-        payload.update({'exp': int(dt.strftime('%s'))})
+        payload.update({'exp': int(dt.timestamp())})
         token = jwt.encode(payload, Config.JWTKEY, algorithm='HS256')
 
         return token

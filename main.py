@@ -9,11 +9,9 @@ cfg = Config()
 repo = UserRepository(cfg)
 app = FastAPI()
 
-
 @app.get("/")
 def ping():
     return {"message": "pong"}
-
 
 @app.post("/auth/sign-up")
 @logger.catch
@@ -26,7 +24,6 @@ def create_user(user: UserModel, status_code=201):
     s['token'] = JWTAuth.generate_jwt_token(s)
     return s
 
-
 @app.post("/auth/sign-in")
 @logger.catch
 def login_user(user: UserModel):
@@ -34,7 +31,7 @@ def login_user(user: UserModel):
     Sign-in handler
     """
     try:
-        status = repo.get_user(user.email, user.password)
+        status = repo.get_user(user.dict())
         status['token'] = JWTAuth.generate_jwt_token(status)
         return status
     except NotAuthenticated:

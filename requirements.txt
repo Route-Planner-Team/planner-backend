@@ -19,3 +19,5 @@ sniffio==1.3.0
 starlette==0.26.1
 typing-extensions==4.5.0
 uvicorn==0.21.0
+passlib==1.7.4
+pyisemail==1.3.2
