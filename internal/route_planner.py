@@ -1,1 +1,0 @@
-# TODO Tutaj bedzie logika do planowania tras i tak dalej
