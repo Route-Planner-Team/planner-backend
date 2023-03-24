@@ -1,13 +1,38 @@
+import firebase_admin
 from fastapi import FastAPI, Request
 from users.user_repository import UserRepository, UserModel
 from loguru import logger
 from config import Config
 from fastapi_exceptions.exceptions import NotAuthenticated
+from fastapi.middleware.cors import CORSMiddleware
 from users.jwt import JWTAuth
+from firebase_admin import credentials, auth
 
+
+cred = credentials.Certificate("route_planner_service_account_keys.json")
+firebase = firebase_admin.initialize_app(cred)
 cfg = Config()
 repo = UserRepository(cfg)
 app = FastAPI()
+
+app.add_middleware(
+   CORSMiddleware,
+   allow_origins=['*'],
+   allow_credentials=True,
+   allow_methods=['*'],
+   allow_headers=['*']
+)
+
+'''
+In postman -> POST https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key=AIzaSyDP8Cmf8asXmcNGpX7wa0PGIPpHMHhBTe4
+body as json -> {"email":"test@wp.pl","password":"test123","returnSecureToken":true}
+u will get "idToken"
+ 
+copy "idToken" and put into any request in Headers (key: Authorization, Value: Bearer <idToken>
+'''
+@app.middleware("http")
+async def firebase_middleware(request: Request, call_next):
+    return await UserRepository.authenticate_header(request, call_next)
 
 @app.get("/")
 def ping():
@@ -21,7 +46,7 @@ def create_user(user: UserModel, status_code=201):
     """
 
     s = repo.create_user(user.dict())
-    s['token'] = JWTAuth.generate_jwt_token(s)
+    #s['token'] = JWTAuth.generate_jwt_token(s)
     return s
 
 @app.post("/auth/sign-in")
@@ -32,7 +57,7 @@ def login_user(user: UserModel):
     """
     try:
         status = repo.get_user(user.dict())
-        status['token'] = JWTAuth.generate_jwt_token(status)
+        #status['token'] = JWTAuth.generate_jwt_token(status)
         return status
     except NotAuthenticated:
         return {"Message": "Auth failed!"}
