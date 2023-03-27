@@ -1,9 +1,0 @@
-{
-  "apiKey": "AIzaSyDP8Cmf8asXmcNGpX7wa0PGIPpHMHhBTe4",
-  "authDomain": "route-daded.firebaseapp.com",
-  "projectId": "route-daded",
-  "storageBucket": "route-daded.appspot.com",
-  "messagingSenderId": "910276291311",
-  "appId": "1:910276291311:web:6e66004ce784a34c0d091a",
-  "databaseURL": "mongodb+srv://palyanitsa:it3JmWiclw0a06HK@clusterrouteplanner.quwa27f.mongodb.net/?retryWrites=true&w=majority"
-};

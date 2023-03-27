@@ -13,6 +13,7 @@ from passlib.context import CryptContext
 from firebase_admin import credentials, auth
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+protected_endpoints = ["/protected", "/test"] #add endpoints you want to autorize
 
 class UserModel(BaseModel):
     email: str
@@ -94,15 +95,18 @@ class UserRepository:
         :param request, call_next:
         :return verify authentication or raise an error:
         """
-
-        try:
-            auth_header = request.headers.get('Authorization')
-            if not auth_header:
-                raise NotAuthenticated('Authorization header not found')
-            auth_token = auth_header.split(" ")[1]
-            decoded_token = auth.verify_id_token(auth_token)
-            request.state.uid = decoded_token['uid']
-        except Exception as e:
-            raise NotAuthenticated(str(e))
-        response = await call_next(request)
-        return response
+        if any(request.url.path.startswith(endpoint) for endpoint in protected_endpoints):
+            try:
+                auth_header = request.headers.get('Authorization')
+                if not auth_header:
+                    raise NotAuthenticated('Authorization header not found')
+                auth_token = auth_header.split(" ")[1]
+                decoded_token = auth.verify_id_token(auth_token)
+                request.state.uid = decoded_token['uid']
+            except Exception as e:
+                raise NotAuthenticated(str(e))
+            response = await call_next(request)
+            return response
+        else:
+            response = await call_next(request)
+            return response
