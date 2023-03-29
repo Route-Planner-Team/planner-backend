@@ -7,9 +7,12 @@ from fastapi_exceptions.exceptions import NotAuthenticated
 from fastapi.middleware.cors import CORSMiddleware
 from users.jwt import JWTAuth
 from firebase_admin import credentials, auth
+import googlemaps
 
 cfg = Config()
+
 repo = UserRepository(cfg)
+
 cred = credentials.Certificate({
     "type": Config.FIREBASE_TYPE,
     "project_id": Config.FIREBASE_PROJECT_ID,
@@ -24,6 +27,9 @@ cred = credentials.Certificate({
 
 })
 firebase = firebase_admin.initialize_app(cred)
+
+gmaps = googlemaps.Client(key=Config.GOOGLEMAPS_API_KEY)
+
 app = FastAPI()
 
 app.add_middleware(
@@ -83,3 +89,4 @@ def protected_handler():
 @logger.catch
 def protected_handler():
     return {"message": "Authorization gained"}
+
