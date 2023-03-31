@@ -8,10 +8,13 @@ from fastapi_exceptions.exceptions import NotAuthenticated
 from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import credentials, auth
 import googlemaps
+from route.model import RouteModel
+from route.planner import RoutePlanner
 
 cfg = Config()
 
 repo = UserRepository(cfg)
+planner = RoutePlanner(cfg)
 
 cred = credentials.Certificate({
     "type": Config.FIREBASE_TYPE,
@@ -94,6 +97,7 @@ def protected_handler():
 @logger.catch
 def protected_handler():
     return {"message": "Authorization gained"}
+
 
 @app.post("/route")
 @logger.catch
