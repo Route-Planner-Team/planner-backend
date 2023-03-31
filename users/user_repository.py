@@ -15,10 +15,6 @@ from firebase_admin import credentials, auth
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 protected_endpoints = ["/protected", "/test"] #add endpoints you want to autorize
 
-class UserModel(BaseModel):
-    email: str
-    password: str
-    # created_at: Optional[str] = datetime.now().isoformat()
 
 class UserRepository:
     def __init__(self, config):
@@ -86,9 +82,9 @@ class UserRepository:
                     # "created_at": new_user['created_at']
                 }
                 return resp
-            raise HTTPException(status_code=404, detail="Wrong password")
+            raise NotAuthenticated('Wrong password')
         except KeyError:
-            raise KeyError
+            raise NotAuthenticated('Wrong body')
 
     async def authenticate_header(request: Request, call_next):
         """

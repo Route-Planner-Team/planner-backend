@@ -1,11 +1,11 @@
 import firebase_admin
 from fastapi import FastAPI, Request
-from users.user_repository import UserRepository, UserModel
+from users.user_repository import UserRepository
+from users.model import UserModel
 from loguru import logger
 from config import Config
 from fastapi_exceptions.exceptions import NotAuthenticated
 from fastapi.middleware.cors import CORSMiddleware
-from users.jwt import JWTAuth
 from firebase_admin import credentials, auth
 import googlemaps
 
@@ -33,11 +33,11 @@ gmaps = googlemaps.Client(key=Config.GOOGLEMAPS_API_KEY)
 app = FastAPI()
 
 app.add_middleware(
-   CORSMiddleware,
-   allow_origins=['*'],
-   allow_credentials=True,
-   allow_methods=['*'],
-   allow_headers=['*'],
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 '''
@@ -49,13 +49,16 @@ u will get "idToken"
 copy idToken and put into any request in Headers (key: Authorization, Value: Bearer <idToken>
 '''
 
+
 @app.middleware("http")
 async def firebase_middleware(request: Request, call_next):
     return await UserRepository.authenticate_header(request, call_next)
 
+
 @app.get("/")
 def ping():
     return {"message": "pong"}
+
 
 @app.post("/auth/sign-up")
 @logger.catch
@@ -66,6 +69,7 @@ def create_user(user: UserModel, status_code=201):
 
     s = repo.create_user(user.dict())
     return s
+
 
 @app.post("/auth/sign-in")
 @logger.catch
@@ -85,8 +89,15 @@ def login_user(user: UserModel):
 def protected_handler():
     return {"message": "Authorization gained"}
 
+
 @app.get("/test")
 @logger.catch
 def protected_handler():
     return {"message": "Authorization gained"}
 
+@app.post("/route")
+@logger.catch
+def route_handler(route: RouteModel):
+    response = {"message": f"Received {route.address}"}
+    route = planner.calculate_route(route.address)
+    return route
