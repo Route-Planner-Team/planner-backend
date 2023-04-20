@@ -24,12 +24,3 @@ class JWTAuth:
             raise KeyError
         except DecodeError:
             raise DecodeError
-
-    # Temporary function for tests, will be deleted
-    @staticmethod
-    def generate_jwt_token(payload: dict):
-        dt = datetime.now() + timedelta(days=1)
-        payload.update({'exp': int(dt.timestamp())})
-        token = jwt.encode(payload, Config.JWTKEY, algorithm='HS256')
-
-        return token
