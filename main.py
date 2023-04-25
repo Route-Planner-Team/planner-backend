@@ -10,11 +10,15 @@ from firebase_admin import credentials, auth
 import googlemaps
 from route.model import RouteModel
 from route.planner import RoutePlanner
+from routes.model import RoutesModel
+from routes.planner import RoutesPlanner
+
 
 cfg = Config()
 
 repo = UserRepository(cfg)
 planner = RoutePlanner(cfg)
+routes_planner = RoutesPlanner(cfg)
 
 cred = credentials.Certificate({
     "type": Config.FIREBASE_TYPE,
@@ -105,3 +109,9 @@ def route_handler(route: RouteModel):
     response = {"message": f"Received {route.address}"}
     route = planner.calculate_route(route.address)
     return route
+
+@app.post("/routes")
+@logger.catch
+def routes_handler(routes: RoutesModel):
+    routes = routes_planner.get_routes(routes.depot_address, routes.address, routes.days, routes.distance_limit, routes.duration_limit, routes.avg_fuel_consumption)
+    return routes
