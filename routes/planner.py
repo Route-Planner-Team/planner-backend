@@ -181,7 +181,7 @@ class RoutesPlanner():
 
         # In this loop, we can recluster points in case any limitations are broken
         # Loop has to be short because long loop would affect efficiency of our function badly
-        # Additionaly in every iteration there is google maps API reques, so to many request could cause fees!
+        # Additionally in every iteration there is google maps API request, so to many request could cause fees!
         for day in range(days):
 
             # Check if it is even possible to generate routes with passed paramaters
@@ -197,5 +197,18 @@ class RoutesPlanner():
 
             else:
                 break
+
+        # Output would be clearer to read
+        def add_parameter_names_to_output(routes):
+            routes_dict = {}
+            for key, value in routes.items():
+                routes_dict[key] = {
+                    'coords': value[0],
+                    'distace(km)': value[1],
+                    'duration(h)': value[2]
+                }
+            return routes_dict
+
+        routes = add_parameter_names_to_output(routes)
 
         return routes
