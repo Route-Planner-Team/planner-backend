@@ -1,6 +1,9 @@
 from pydantic import BaseModel
 
 
+class RouteModel(BaseModel):
+    address: list = []
+
 class RoutesModel(BaseModel):
     depot_address: str
     address: list = []
