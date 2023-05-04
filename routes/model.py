@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, constr
 
 
 class RouteModel(BaseModel):
@@ -10,4 +10,4 @@ class RoutesModel(BaseModel):
     days: int
     distance_limit: int
     duration_limit: int
-    avg_fuel_consumption: int
+    preferences: constr(regex='^(distance|duration)$')
