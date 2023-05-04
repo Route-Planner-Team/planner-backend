@@ -1,6 +1,5 @@
 serv:
 	uvicorn main:app --reload
 test:
-	pytest
+	pytest -s
 	# run tests via all ./* with test_ prefix
-	

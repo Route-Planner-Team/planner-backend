@@ -1,3 +1,4 @@
+from urllib import response
 import pytest
 from fastapi.testclient import TestClient
 from main import app  # maybe should be into tests package, but we should move main.py to app directory
@@ -6,7 +7,7 @@ from main import app  # maybe should be into tests package, but we should move m
 def client():
     return TestClient(app)  # client to test (like app, fast api object, FastApi() )
 
-def test_route_endpoint(client):
+def test_route_endpoint(client: TestClient):
     url = '/route'  # URL edpoint to some handler
     data = {
         "address": [
@@ -24,3 +25,25 @@ def test_route_endpoint(client):
 
 
 #
+
+def test_planner_endpoint(client: TestClient):
+    url = '/routes'
+    data = {
+        "depot_address": "Naramowicka 219, 61-611 Poznań",
+        "address": ["Rubież 46, C3 11, 61-612 Poznań",
+                    "Rubież 14a/37, 61-612 Poznań",
+                    "Radłowa 16, 61-602 Poznań",
+                    "Zagajnikowa 9, 60-995 Poznań"],
+        "days": 1,
+        "distance_limit":30,
+        "duration_limit": 10000,
+        "avg_fuel_consumption": 6
+    }
+
+    response = client.post(url, json=data)
+    route = response.json()
+    
+
+    assert response.status_code == 200
+    assert response.content != "null"
+
