@@ -13,7 +13,7 @@ class RoutesPlanner():
     def __init__(self, config):
         self.config = config
 
-    def get_routes(self, depot_address, addresses, days, distance_limit, duration_limit, avg_fuel_consumption):
+    def get_routes(self, depot_address, addresses, days, distance_limit, duration_limit, preferences):
         '''
         Function generates n routes, returns a dict of all addresses in correct order including depot
         Params:
@@ -22,10 +22,10 @@ class RoutesPlanner():
         - days - indicates number of routes (int)
         - distance_limit - number of kilometers we can drive in one day (int)
         - duration_limit - number of hours we can drive in one day (int)
-        - avg_fuel_consumption - average fuel consumption (int)
+        - preferences - can be 'distance' or 'duration', based of that, routes would be chosen by this parameter (str)
         '''
 
-        # Function transforms string addres of our depot to coordinates
+        # Function transforms string address of our depot to coordinates
         def get_depot_coords(depot_address):
             return gmaps.geocode(depot_address)[0]['geometry']['location']
 
@@ -41,7 +41,7 @@ class RoutesPlanner():
 
         addresses_coords = get_addresses_coords(addresses)
 
-        # Function uses KMeans to cluster location into clusters, df is out data in pandas DataFrame
+        # Function uses KMeans to cluster location into clusters, df is our data in pandas DataFrame
         # Days is a number of cluster
         def cluster_addresses(df, days):
             model = KMeans(n_clusters=days)
@@ -91,10 +91,8 @@ class RoutesPlanner():
                 total_distance = 0  # in km
                 total_duration = 0  # in hours
                 for location in range(len(whole_route) - 1):
-                    total_distance = (directions_result[0]['legs'][location]['distance'][
-                                          'value'] / 1000) + total_distance
-                    total_duration = (directions_result[0]['legs'][location]['duration'][
-                                          'value'] / 3600) + total_duration
+                    total_distance = (directions_result[0]['legs'][location]['distance']['value'] / 1000) + total_distance
+                    total_duration = (directions_result[0]['legs'][location]['duration']['value'] / 3600) + total_duration
 
                 routes[label] = [whole_route, total_distance, total_duration]
 
@@ -123,31 +121,31 @@ class RoutesPlanner():
 
         # Function takes dict with optimized routes and list od total distances
         # In case a route breaks a distance or a duration daily limit we have to rearrange clusters (routes)
-        # We move location from longest route that is most similar (is the closest to the centroid) to the shortest route and put it in there
+        # We move location from longest route, that is most similar (is the closest to the centroid) to the shortest route and put it in there
         def reorganise_routes(routes, distances):
 
-            # Function takie dict with routes
+            # Function take dict with routes
             # Convert data do DataFrame for further set_optimal_waypoints(df, depot_address) usage
             def routes_to_df(routes):
-                df = pd.DataFrame(columns=['lat', 'lng', 'label'])
-
+                df_list = []
                 for key in routes:
                     data = routes[key][0][1:-1]
-                    df = df.append(pd.DataFrame({'lat': [coord[0] for coord in data],
+                    df_list.append(pd.DataFrame({'lat': [coord[0] for coord in data],
                                                  'lng': [coord[1] for coord in data],
                                                  'label': key}))
 
+                df = pd.concat(df_list, ignore_index=True)
                 return df
 
             # Function takes dict with optimized routes and list od total distances
-            # Funtion finds a location that will be reclustered
+            # Function finds a location that will be reclustered
             def find_location_to_recluster(routes, distances):
 
                 # Find indexes of longest and shortest route
                 shortest_route = distances.index(min(distances))
                 longest_route = distances.index(max(distances))
 
-                # We have to check how many locations there are in longest route, in case it is only one location, we can not take away that point
+                # We have to check how many locations are there in longest route, in case it is only one location, we can not take away that point
                 # from the route, because route would become empty
                 while len(routes[longest_route][0]) < 4:
                     longest_route = distances.index(max(distances))
@@ -181,24 +179,57 @@ class RoutesPlanner():
 
             return df
 
-        # In this loop, we can recluster points in case any limitations are broken
+        # List with all routes, later we will choose one that minimize given preferences
+        all_routes = []
+        all_routes.append(routes)
+
+        # We will generate more possible routes if there is more than 1 day
         # Loop has to be short because long loop would affect efficiency of our function badly
-        # Additionaly in every iteration there is google maps API reques, so to many request could cause fees!
-        for day in range(days):
-
-            # Check if it is even possible to generate routes with passed paramaters
-            if sum(distances) > distance_limit * days or sum(durations) > duration_limit * days:
-                return ('Can not compute routes for this parameters. Modify parameters.')
-
-            # Case to recluster some points
-            if any(distance > distance_limit for distance in distances) or any(
-                    duration > duration_limit for duration in durations):
+        # Additionally in every iteration there is google maps API request, so to many requests could cause fees!
+        if days > 1:
+            for day in range(1, days):
                 df_addresses = reorganise_routes(routes, distances)
                 routes = set_optimal_waypoints(df_addresses, depot_coords)
                 distances = calculate_distances(routes)
+                all_routes.append(routes)
 
-            else:
-                break
+        # We have to check if any route break daily limitations, and if so, we have to remove it from the list
+        def check_limitations(all_routes):
+            all_routes = [dis for dis in all_routes if all(val[1] <= distance_limit for val in dis.values())]
+            all_routes = [dur for dur in all_routes if all(val[2] <= duration_limit for val in dur.values())]
+            return all_routes
+
+        all_routes = check_limitations(all_routes)
+
+        # Function will choose routes that minimize preference given by user
+        def choose_min_routes(all_routes, preference):
+            if preference == 'distance':
+                index_of_min_sum = min(range(len(all_routes)), key=lambda i: sum(value[1] for value in all_routes[i].values()))
+            elif preference == 'duration':
+                index_of_min_sum = min(range(len(all_routes)), key=lambda i: sum(value[2] for value in all_routes[i].values()))
+            return all_routes[index_of_min_sum]
+
+        # Return routes that minimize given preferences
+        if len(all_routes) == 0:
+            return ('Can not compute routes for this parameters. Modify parameters.')
+        else:
+            if preferences == 'distance':
+                routes = choose_min_routes(all_routes, 'distance')
+            elif preferences == 'duration':
+                routes = choose_min_routes(all_routes, 'duration')
+
+        # Output would be clearer to read
+        def add_parameter_names_to_output(routes):
+            routes_dict = {}
+            for key, value in routes.items():
+                routes_dict[key] = {
+                    'coords': value[0],
+                    'distance_km': value[1],
+                    'duration_hours': value[2]
+                }
+            return routes_dict
+
+        routes = add_parameter_names_to_output(routes)
 
         return routes
 

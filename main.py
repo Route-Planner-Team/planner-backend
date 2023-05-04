@@ -110,5 +110,5 @@ def route_handler(route: RouteModel):
 @app.post("/routes")
 @logger.catch
 def routes_handler(routes: RoutesModel):
-    routes = routes_planner.get_routes(routes.depot_address, routes.address, routes.days, routes.distance_limit, routes.duration_limit, routes.avg_fuel_consumption)
+    routes = routes_planner.get_routes(routes.depot_address, routes.address, routes.days, routes.distance_limit, routes.duration_limit, routes.preferences)
     return routes
