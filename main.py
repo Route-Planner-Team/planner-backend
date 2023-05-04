@@ -8,8 +8,7 @@ from fastapi_exceptions.exceptions import NotAuthenticated
 from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import credentials, auth
 import googlemaps
-from route.model import RouteModel
-from route.planner import RoutePlanner
+from routes.model import RouteModel
 from routes.model import RoutesModel
 from routes.planner import RoutesPlanner
 
@@ -17,7 +16,6 @@ from routes.planner import RoutesPlanner
 cfg = Config()
 
 repo = UserRepository(cfg)
-planner = RoutePlanner(cfg)
 routes_planner = RoutesPlanner(cfg)
 
 cred = credentials.Certificate({
@@ -52,7 +50,7 @@ To get authorization token:
 In postman -> POST https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key=<FIREBASE_API_KEY> (from env)
 body as json -> {"email":"test@wp.pl","password":"test123","returnSecureToken":true}
 u will get "idToken"
- 
+
 copy idToken and put into any request in Headers (key: Authorization, Value: Bearer <idToken>
 '''
 
@@ -106,8 +104,7 @@ def protected_handler():
 @app.post("/route")
 @logger.catch
 def route_handler(route: RouteModel):
-    response = {"message": f"Received {route.address}"}
-    route = planner.calculate_route(route.address)
+    route = routes_planner.calculate_route(route.address)
     return route
 
 @app.post("/routes")
