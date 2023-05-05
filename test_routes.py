@@ -2,10 +2,16 @@ from urllib import response
 import pytest
 from fastapi.testclient import TestClient
 from main import app  # maybe should be into tests package, but we should move main.py to app directory
+from config import Config
+from googlemaps import Client as GoogleMapsClient
 
 @pytest.fixture
 def client():
     return TestClient(app)  # client to test (like app, fast api object, FastApi() )
+
+@pytest.fixture
+def gmaps_client():
+    return GoogleMapsClient(key=Config.GOOGLEMAPS_API_KEY)
 
 def test_route_endpoint(client: TestClient):
     url = '/route'  # URL edpoint to some handler
@@ -37,13 +43,22 @@ def test_planner_endpoint(client: TestClient):
         "days": 1,
         "distance_limit":30,
         "duration_limit": 10000,
-        "avg_fuel_consumption": 6
+        "avg_fuel_consumption": 6,
+        "preferences": "duration"
     }
+    # add aditional field id to route response
+    # make table with route_id and user id
 
     response = client.post(url, json=data)
     route = response.json()
-    
+
+    # expected route for first(0) day, route should contains >= 1 day limit
+    assert route['0']
+
 
     assert response.status_code == 200
     assert response.content != "null"
 
+def test_planner_decode_coord(gmaps_client: GoogleMapsClient):
+    # prepared for feature tests 
+    pass
