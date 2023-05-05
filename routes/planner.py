@@ -219,15 +219,26 @@ class RoutesPlanner():
                 routes = choose_min_routes(all_routes, 'duration')
 
         # Output would be clearer to read
-        def add_parameter_names_to_output(routes):
-            routes_dict = {}
-            for key, value in routes.items():
-                routes_dict[key] = {
-                    'coords': value[0],
-                    'distance_km': value[1],
-                    'duration_hours': value[2]
-                }
-            return routes_dict
+        # def add_parameter_names_to_output(routes):
+        #     routes_dict = {}
+        #     for key, value in routes.items():
+        #         routes_dict[key] = {
+        #             'coords': value[0],
+        #             'distance_km': value[1],
+        #             'duration_hours': value[2]
+        #         }
+        #     return routes_dict
+            def add_parameter_names_to_output(routes):
+                routes_dict = {}
+                for key, value in routes.items():
+                    routes_dict[key] = {
+                        'coords': value[0],
+                        'distance_km': value[1],
+                        'duration_hours': value[2]
+                    }
+                for key in routes_dict:
+                    routes_dict[key]['coords'] = [[coord[0], coord[1]] for coord in routes_dict[key]['coords']]
+                return routes_dict
 
         routes = add_parameter_names_to_output(routes)
 

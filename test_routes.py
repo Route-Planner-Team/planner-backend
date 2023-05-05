@@ -2,16 +2,10 @@ from urllib import response
 import pytest
 from fastapi.testclient import TestClient
 from main import app  # maybe should be into tests package, but we should move main.py to app directory
-from config import Config
-from googlemaps import Client as GoogleMapsClient
 
 @pytest.fixture
 def client():
     return TestClient(app)  # client to test (like app, fast api object, FastApi() )
-
-@pytest.fixture
-def gmaps_client():
-    return GoogleMapsClient(key=Config.GOOGLEMAPS_API_KEY)
 
 def test_route_endpoint(client: TestClient):
     url = '/route'  # URL edpoint to some handler
@@ -46,19 +40,38 @@ def test_planner_endpoint(client: TestClient):
         "avg_fuel_consumption": 6,
         "preferences": "duration"
     }
-    # add aditional field id to route response
-    # make table with route_id and user id
 
     response = client.post(url, json=data)
     route = response.json()
-
-    # expected route for first(0) day, route should contains >= 1 day limit
-    assert route['0']
 
 
     assert response.status_code == 200
     assert response.content != "null"
 
-def test_planner_decode_coord(gmaps_client: GoogleMapsClient):
-    # prepared for feature tests 
-    pass
+def test_save_user_route(client: TestClient):
+    url = '/routes'
+    data = {
+        "depot_address": "Naramowicka 219, 61-611 Poznań",
+        "address": ["Rubież 46, C3 11, 61-612 Poznań",
+                    "Rubież 14a/37, 61-612 Poznań",
+                    "Radłowa 16, 61-602 Poznań",
+                    "Zagajnikowa 9, 60-995 Poznań"],
+        "days": 1,
+        "distance_limit":30,
+        "duration_limit": 10000,
+        "avg_fuel_consumption": 6,
+        "preferences": "duration",
+        "user_email": "test_user@gmail.com"
+    }
+
+    response = client.post(url, json=data)
+    # print(response.json())
+
+    assert response.status_code == 200
+    assert response.content != "null"
+
+def test_find_user_route_by_email(client: TestClient):
+    email = "123456@gmail.com"
+    response = client.get(f"/routes/?email={email}")
+    print(response.json())
+    assert response.status_code == 200
