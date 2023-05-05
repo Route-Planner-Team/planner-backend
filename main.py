@@ -11,11 +11,14 @@ import googlemaps
 from routes.model import RouteModel
 from routes.model import RoutesModel
 from routes.planner import RoutesPlanner
+from routes.route_repository import RouteRepository
 
 
 cfg = Config()
 
 repo = UserRepository(cfg)
+routes_repo = RouteRepository(cfg)
+
 routes_planner = RoutesPlanner(cfg)
 
 cred = credentials.Certificate({
@@ -110,10 +113,21 @@ def route_handler(route: RouteModel):
 @app.post("/routes")
 @logger.catch
 def routes_handler(routes: RoutesModel):
+    user_email = routes.user_email
     routes = routes_planner.get_routes(routes.depot_address,
                                        routes.address,
                                        routes.days,
                                        routes.distance_limit,
                                        routes.duration_limit,
                                        routes.preferences)
+    if user_email is not None:
+        # add logic to add users_route to db
+        r = routes_repo.create_user_route(user_email, routes)
+        return r
+
     return routes
+
+@app.get("/routes")
+def get_user_route(email: str):
+    s = routes_repo.get_route_by_user_email(email=email)
+    return {"Result": s}
