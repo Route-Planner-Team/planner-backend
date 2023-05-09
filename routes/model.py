@@ -1,4 +1,5 @@
-from pydantic import BaseModel, constr
+from pydantic import BaseModel, constr, Field
+from typing import Optional
 
 
 class RouteModel(BaseModel):
@@ -11,3 +12,4 @@ class RoutesModel(BaseModel):
     distance_limit: int
     duration_limit: int
     preferences: constr(regex='^(distance|duration)$')
+    user_email: Optional[str] = Field(required=False)
