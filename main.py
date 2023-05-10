@@ -1,7 +1,7 @@
 import firebase_admin
 from fastapi import FastAPI, Request
 from users.user_repository import UserRepository
-from users.model import UserModel
+from users.model import UserModel, UserModelChangePassword
 from loguru import logger
 from config import Config
 from fastapi_exceptions.exceptions import NotAuthenticated
@@ -12,7 +12,6 @@ from routes.model import RouteModel
 from routes.model import RoutesModel
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
-
 
 cfg = Config()
 
@@ -75,8 +74,8 @@ def create_user(user: UserModel, status_code=201):
     Handler to create user
     """
 
-    s = repo.create_user(user.dict())
-    return s
+    status = repo.create_user(user.dict())
+    return status
 
 
 @app.post("/auth/sign-in")
@@ -90,6 +89,17 @@ def login_user(user: UserModel):
         return status
     except NotAuthenticated:
         return {"Message": "Auth failed!"}
+
+
+@app.post("/auth/change-password")
+@logger.catch
+def change_password(user: UserModelChangePassword):
+    """
+    Handler to change password for logged in user
+    """
+
+    status = repo.change_password(user.dict())
+    return status
 
 
 @app.get("/protected")
@@ -110,6 +120,7 @@ def route_handler(route: RouteModel):
     route = routes_planner.calculate_route(route.address)
     return route
 
+
 @app.post("/routes")
 @logger.catch
 def routes_handler(routes: RoutesModel):
@@ -126,6 +137,7 @@ def routes_handler(routes: RoutesModel):
         return r
 
     return routes
+
 
 @app.get("/routes")
 def get_user_route(email: str):
