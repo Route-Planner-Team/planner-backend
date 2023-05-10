@@ -17,7 +17,7 @@ import json
 import config
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-protected_endpoints = ["/protected", "/test"]  # add endpoints you want to autorize
+protected_endpoints = ["/protected", "/test"]  # add endpoints you want to authorize
 
 
 class UserRepository:
@@ -108,6 +108,24 @@ class UserRepository:
             updated_firebase_user = auth.update_user(firebase_user.uid, password=body['new_password'])
 
         return updated_firebase_user
+
+    def forgot_password(self, body: dict) -> dict:
+        """
+        :param body: example {"email": "abc@gmail.com"}
+        :return: dict
+        """
+
+        if not self.users_collection.find_one({"email": body['email']}):
+            raise HTTPException(status_code=404, detail="No user with that email address")
+
+        rest_api_url = "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode"
+        data = {"requestType": "PASSWORD_RESET", "email": body['email']}
+
+        r = requests.post(rest_api_url,
+                          params={'key': config.Config.FIREBASE_API_KEY},
+                          data=data)
+
+        return r.json()
 
     async def authenticate_header(request: Request, call_next):
         """

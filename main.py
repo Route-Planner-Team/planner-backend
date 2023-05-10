@@ -1,7 +1,7 @@
 import firebase_admin
 from fastapi import FastAPI, Request
 from users.user_repository import UserRepository
-from users.model import UserModel, UserModelChangePassword
+from users.model import UserModel, UserModelChangePassword, UserModelForgotPassword
 from loguru import logger
 from config import Config
 from fastapi_exceptions.exceptions import NotAuthenticated
@@ -99,6 +99,17 @@ def change_password(user: UserModelChangePassword):
     """
 
     status = repo.change_password(user.dict())
+    return status
+
+
+@app.post("/auth/forgot-password")
+@logger.catch
+def forgot_password(user: UserModelForgotPassword):
+    """
+    Handler to change password for not logged in user
+    """
+
+    status = repo.forgot_password(user.dict())
     return status
 
 
