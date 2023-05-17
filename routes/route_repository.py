@@ -3,6 +3,8 @@ from loguru import logger
 from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo.database import Database
+from passlib.context import CryptContext
+from firebase_admin import credentials, auth
 from pymongo.results import InsertOneResult
 
 
@@ -13,7 +15,6 @@ class RouteRepository():
         self.db: Database = self.client.route_db
         self.routes_collection: Collection = self.client.route_db.routes
         logger.info("Inited routes repo")
-
 
     # documents must have only string keys, key was 0
     def convert_dict_keys_to_str(self, dictionary):
@@ -27,10 +28,11 @@ class RouteRepository():
         else:
             return dictionary
 
-
-    def create_user_route(self,  email: str, body: dict):
-        r=self.convert_dict_keys_to_str(body)
-        r["email"]=  email
+    def create_user_route(self, uid: str, body: dict):
+        r = self.convert_dict_keys_to_str(body)
+        r['uid'] = uid
+        firebase_user = auth.get_user(uid)
+        r['email'] = firebase_user.email
         res = self.routes_collection.insert_one(dict(r))
         return r
 
@@ -38,6 +40,6 @@ class RouteRepository():
         resp = self.routes_collection.find({"email": email})
         r = []
         for doc in resp:
-            del doc['_id']
+            # del doc['_id']     # no longer stored in database
             r.append(doc)
         return r
