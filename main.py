@@ -1,7 +1,7 @@
 import firebase_admin
 from fastapi import FastAPI, Request
 from users.user_repository import UserRepository
-from users.model import UserModel, UserModelChangePassword, UserModelForgotPassword
+from users.model import UserModel, UserModelChangePassword, UserEmailModel
 from loguru import logger
 from config import Config
 from fastapi_exceptions.exceptions import NotAuthenticated
@@ -104,7 +104,7 @@ def change_password(user: UserModelChangePassword):
 
 @app.post("/auth/forgot-password")
 @logger.catch
-def forgot_password(user: UserModelForgotPassword):
+def forgot_password(user: UserEmailModel):
     """
     Handler to change password for not logged in user
     """
@@ -150,7 +150,12 @@ def routes_handler(routes: RoutesModel):
     return routes
 
 
-@app.get("/routes")
-def get_user_route(email: str):
-    s = routes_repo.get_route_by_user_email(email=email)
+@app.post("/user_route")
+def get_user_route(user: UserEmailModel):
+    s = routes_repo.get_user_route(email=user.email)
     return {"Result": s}
+
+@app.delete("/user_route")
+def del_user_route(user: UserModel):
+    count = routes_repo.delete_user_route(email=user.email)
+    return {"Deleted": count}

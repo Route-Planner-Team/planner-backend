@@ -13,5 +13,5 @@ class UserModelChangePassword(BaseModel):
     confirm_new_password: str
 
 
-class UserModelForgotPassword(BaseModel):
+class UserEmailModel(BaseModel):
     email: str
