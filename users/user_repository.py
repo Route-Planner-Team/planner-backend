@@ -36,8 +36,8 @@ class UserRepository:
         :return: dict
         """
 
-        if self.users_collection.find_one({"email": body['email']}):
-            raise HTTPException(status_code=404, detail="User with this email already exists")
+        # if self.users_collection.find_one({"email": body['email']}):
+        #     raise HTTPException(status_code=404, detail="User with this email already exists")
 
         firebase_user = auth.create_user(
             email=body['email'],
@@ -47,8 +47,8 @@ class UserRepository:
         body['uid'] = firebase_user.uid
 
         del body['password']
-        user: InsertOneResult = self.users_collection.insert_one(body)
-        new_user = self.users_collection.find_one({"_id": user.inserted_id})
+        # user: InsertOneResult = self.users_collection.insert_one(body)
+        # new_user = self.users_collection.find_one({"_id": user.inserted_id})
 
         resp = {
             "_id": str(new_user['_id']),
@@ -74,15 +74,14 @@ class UserRepository:
         if user['uid'] != firebase_user.uid:
             raise ValueError('Firebase UID does not match MongoDB UID')
 
-        rest_api_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword"
+        rest_api_url = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key={config.Config.FIREBASE_API_KEY}"
         payload = json.dumps({
             'email': body['email'],
-            'password': body['password']
+            'password': body['password'],
+            "returnSecureToken": True
         })
 
-        r = requests.post(rest_api_url,
-                          params={'key': config.Config.FIREBASE_API_KEY},
-                          data=payload)
+        r = requests.post(rest_api_url,data=payload)
 
         response = r.json()
 
@@ -130,7 +129,7 @@ class UserRepository:
         return r.json()
 
 
-    async def authenticate_header(request: Request, call_next):
+    def authenticate_header(request: Request, call_next):
         """
         :param request, call_next:
         :return verify authentication or raise an error:
@@ -145,8 +144,8 @@ class UserRepository:
                 request.state.uid = decoded_token['uid']
             except Exception as e:
                 raise NotAuthenticated(str(e))
-            response = await call_next(request)
+            response = call_next(request)
             return response
         else:
-            response = await call_next(request)
+            response = call_next(request)
             return response
