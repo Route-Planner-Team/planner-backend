@@ -13,7 +13,7 @@ class RoutesPlanner():
     def __init__(self, config):
         self.config = config
 
-    def get_routes(self, depot_address, addresses, days, distance_limit, duration_limit, preferences):
+    def get_routes(self, depot_address, addresses, days, distance_limit, duration_limit, preferences, avoid_tolls):
         '''
         Function generates n routes, returns a dict of all addresses in correct order including depot
         Params:
@@ -69,12 +69,22 @@ class RoutesPlanner():
                 # Define waypoints
                 waypoints = [depot] + addresses + [depot]
 
-                # Direction from google
-                directions_result = gmaps.directions(waypoints[0],
-                                                     waypoints[-1],
-                                                     waypoints=waypoints[1:-1],
-                                                     mode='driving',
-                                                     optimize_waypoints=True)
+                # If user wants to avoid tolls
+                if avoid_tolls is True:
+                    # Direction from google
+                    directions_result = gmaps.directions(waypoints[0],
+                                                         waypoints[-1],
+                                                         waypoints=waypoints[1:-1],
+                                                         mode='driving',
+                                                         avoid='tolls',
+                                                         optimize_waypoints=True)
+                else:
+                    # Direction from google
+                    directions_result = gmaps.directions(waypoints[0],
+                                                         waypoints[-1],
+                                                         waypoints=waypoints[1:-1],
+                                                         mode='driving',
+                                                         optimize_waypoints=True)
 
                 # List with ordered addresses indexes
                 optimal_order = directions_result[0]['waypoint_order']
