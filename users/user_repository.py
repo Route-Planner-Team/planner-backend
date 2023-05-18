@@ -9,15 +9,16 @@ from pymongo.collection import Collection
 from pymongo.database import Database
 from pymongo.results import InsertOneResult
 from fastapi_exceptions.exceptions import NotAuthenticated
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Depends
 from passlib.context import CryptContext
 from firebase_admin import credentials, auth
 import json
+from typing import Annotated
 
 import config
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-protected_endpoints = ["/protected", "/test"]  # add endpoints you want to authorize
+protected_endpoints = ["/protected", "/test", "/auth/change-password", "/routes"]  # add endpoints you want to authorize
 
 
 class UserRepository:
@@ -94,13 +95,14 @@ class UserRepository:
 
         return response
 
-    def change_password(self, body: dict) -> dict:
+    def change_password(self, uid, body: dict) -> dict:
         """
-        :param body: example {"email": "abc@gmail.com", "new_password": "test123!", "confirm_new_password": "test123!"}
+        :param uid:
+        :param body: example {"new_password": "test123!", "confirm_new_password": "test123!"}
         :return: dict
         """
 
-        firebase_user = auth.get_user_by_email(body['email'])
+        firebase_user = auth.get_user(uid)
 
         if body['new_password'] != body['confirm_new_password']:
             raise ValueError("Passed passwords are not identical.")
@@ -126,6 +128,7 @@ class UserRepository:
                           data=data)
 
         return r.json()
+
 
     async def authenticate_header(request: Request, call_next):
         """

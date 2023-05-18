@@ -8,8 +8,7 @@ from fastapi_exceptions.exceptions import NotAuthenticated
 from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import credentials, auth
 import googlemaps
-from routes.model import RouteModel
-from routes.model import RoutesModel
+from routes.model import RouteModel, RoutesModel
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
 
@@ -93,15 +92,20 @@ def login_user(user: UserModel):
 
 @app.post("/auth/change-password")
 @logger.catch
-def change_password(user: UserModelChangePassword):
+def change_password(request: Request, user: UserModelChangePassword):
     """
     Handler to change password for logged in user
     """
 
-    status = repo.change_password(user.dict())
+    uid = request.state.uid
+    if uid is None:
+        raise NotAuthenticated('User ID not found in token')
+
+    status = repo.change_password(uid, user.dict())
     return status
 
 
+# endpoint is protected, so do instructions from line 51
 @app.post("/auth/forgot-password")
 @logger.catch
 def forgot_password(user: UserEmailModel):
@@ -115,8 +119,8 @@ def forgot_password(user: UserEmailModel):
 
 @app.get("/protected")
 @logger.catch
-def protected_handler():
-    return {"message": "Authorization gained"}
+def protected_handler(request: Request):
+    return request.state.uid
 
 
 @app.get("/test")
@@ -132,10 +136,14 @@ def route_handler(route: RouteModel):
     return route
 
 
+# endpoint is protected, so do instructions from line 51
 @app.post("/routes")
 @logger.catch
-def routes_handler(routes: RoutesModel):
-    user_email = routes.user_email
+def routes_handler(request: Request, routes: RoutesModel):
+    uid = request.state.uid
+    if uid is None :
+        raise NotAuthenticated('User ID not found in token')
+
     routes = routes_planner.get_routes(routes.depot_address,
                                        routes.address,
                                        routes.days,
@@ -143,14 +151,12 @@ def routes_handler(routes: RoutesModel):
                                        routes.duration_limit,
                                        routes.preferences,
                                        routes.avoid_tolls)
-    if user_email is not None:
-        # add logic to add users_route to db
-        r = routes_repo.create_user_route(user_email, routes)
-        return r
 
+    # add logic to add users_route to db
+    routes = routes_repo.create_user_route(uid, routes)
     return routes
-
-
+  
+#maybe should be in protected endpoints 
 @app.post("/user_route")
 def get_user_route(user: UserEmailModel):
     s = routes_repo.get_user_route(email=user.email)

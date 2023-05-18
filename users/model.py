@@ -8,7 +8,6 @@ class UserModel(BaseModel):
 
 
 class UserModelChangePassword(BaseModel):
-    email: str
     new_password: str
     confirm_new_password: str
 
