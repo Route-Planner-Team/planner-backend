@@ -141,7 +141,8 @@ def routes_handler(routes: RoutesModel):
                                        routes.days,
                                        routes.distance_limit,
                                        routes.duration_limit,
-                                       routes.preferences)
+                                       routes.preferences,
+                                       routes.avoid_tolls)
     if user_email is not None:
         # add logic to add users_route to db
         r = routes_repo.create_user_route(user_email, routes)
