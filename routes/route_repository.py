@@ -36,10 +36,15 @@ class RouteRepository():
         res = self.routes_collection.insert_one(dict(r))
         return r
 
-    def get_route_by_user_email(self, email):
+    def get_user_route(self, email):
         resp = self.routes_collection.find({"email": email})
         r = []
         for doc in resp:
-            # del doc['_id']     # no longer stored in database
+            del doc['_id']
+            del doc['email']
             r.append(doc)
         return r
+
+    def delete_user_route(self, email) -> int:
+        resp = self.routes_collection.delete_many({"email": email})
+        return resp.deleted_count

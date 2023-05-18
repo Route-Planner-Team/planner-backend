@@ -1,7 +1,7 @@
 import firebase_admin
 from fastapi import FastAPI, Request
 from users.user_repository import UserRepository
-from users.model import UserModel, UserModelChangePassword, UserModelForgotPassword
+from users.model import UserModel, UserModelChangePassword, UserEmailModel
 from loguru import logger
 from config import Config
 from fastapi_exceptions.exceptions import NotAuthenticated
@@ -108,7 +108,7 @@ def change_password(request: Request, user: UserModelChangePassword):
 # endpoint is protected, so do instructions from line 51
 @app.post("/auth/forgot-password")
 @logger.catch
-def forgot_password(user: UserModelForgotPassword):
+def forgot_password(user: UserEmailModel):
     """
     Handler to change password for not logged in user
     """
@@ -155,13 +155,14 @@ def routes_handler(request: Request, routes: RoutesModel):
     # add logic to add users_route to db
     routes = routes_repo.create_user_route(uid, routes)
     return routes
-
-# change name of an endpoint
-# pass only request in params and check uid (exactly the same as above)
-# in get_route_by_user_email create firebase_user like in create_user_route
-# you can use 'find' method for firebase_user.uid or firebase_user.email, both values are saved in db
-# you can add this endpoint to users/user_repository to 'protected_endpoints'
-@app.get("/routes")
-def get_user_route(email: str):
-    s = routes_repo.get_route_by_user_email(email=email)
+  
+#maybe should be in protected endpoints 
+@app.post("/user_route")
+def get_user_route(user: UserEmailModel):
+    s = routes_repo.get_user_route(email=user.email)
     return {"Result": s}
+
+@app.delete("/user_route")
+def del_user_route(user: UserModel):
+    count = routes_repo.delete_user_route(email=user.email)
+    return {"Deleted": count}

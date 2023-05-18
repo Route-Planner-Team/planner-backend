@@ -14,5 +14,4 @@ class RoutesModel(BaseModel):
     duration_limit: int
     preferences: constr(regex='^(distance|duration)$')
     avoid_tolls: bool
-    # user_email: Optional[str] = Field(required=False)
-
+    user_email: Optional[str] = Field(required=False)
