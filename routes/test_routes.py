@@ -1,7 +1,6 @@
 from urllib import response
 import pytest
 from fastapi.testclient import TestClient
-import sys
 from main import app
 from main import routes_repo
 

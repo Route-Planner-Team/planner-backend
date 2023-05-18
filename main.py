@@ -14,7 +14,7 @@ from routes.route_repository import RouteRepository
 
 cfg = Config()
 
-repo = UserRepository(cfg)
+user_repo = UserRepository(cfg)
 routes_repo = RouteRepository(cfg)
 
 routes_planner = RoutesPlanner(cfg)
@@ -55,10 +55,13 @@ u will get "idToken"
 copy idToken and put into any request in Headers (key: Authorization, Value: Bearer <idToken>
 '''
 
+def change_key_name(dictionary, old_key, new_key):
+    if old_key in dictionary:
+        dictionary[new_key] = dictionary.pop(old_key)
 
 @app.middleware("http")
 async def firebase_middleware(request: Request, call_next):
-    return await UserRepository.authenticate_header(request, call_next)
+    return await UserRepository.authenticate_header(request, call_next) # type: ignore
 
 
 @app.get("/")
@@ -73,7 +76,7 @@ def create_user(user: UserModel, status_code=201):
     Handler to create user
     """
 
-    status = repo.create_user(user.dict())
+    status = user_repo.create_user(user.dict())
     return status
 
 
@@ -84,8 +87,17 @@ def login_user(user: UserModel):
     Sign-in handler
     """
     try:
-        status = repo.get_user(user.dict())
-        return status
+        firebase_payload = user_repo.get_user(user.dict())
+        del firebase_payload['kind']
+        del firebase_payload['localId']
+        del firebase_payload['displayName']
+        del firebase_payload['registered']
+
+        change_key_name(firebase_payload, "idToken", "acces_token")
+        change_key_name(firebase_payload, "refreshToken", "refresh_token")
+
+        return firebase_payload
+
     except NotAuthenticated:
         return {"Message": "Auth failed!"}
 
@@ -101,7 +113,7 @@ def change_password(request: Request, user: UserModelChangePassword):
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
 
-    status = repo.change_password(uid, user.dict())
+    status = user_repo.change_password(uid, user.dict())
     return status
 
 
@@ -113,26 +125,19 @@ def forgot_password(user: UserEmailModel):
     Handler to change password for not logged in user
     """
 
-    status = repo.forgot_password(user.dict())
+    status = user_repo.forgot_password(user.dict())
     return status
 
 
 @app.get("/protected")
 @logger.catch
 def protected_handler(request: Request):
-    return request.state.uid
-
-
-@app.get("/test")
-@logger.catch
-def protected_handler():
-    return {"message": "Authorization gained"}
-
+    return {"user_id" :request.state.uid}
 
 @app.post("/route")
 @logger.catch
 def route_handler(route: RouteModel):
-    route = routes_planner.calculate_route(route.address)
+    route = routes_planner.calculate_route(route.address) # type: ignore
     return route
 
 
@@ -150,13 +155,13 @@ def routes_handler(request: Request, routes: RoutesModel):
                                        routes.distance_limit,
                                        routes.duration_limit,
                                        routes.preferences,
-                                       routes.avoid_tolls)
+                                       routes.avoid_tolls) # type: ignore
 
     # add logic to add users_route to db
-    routes = routes_repo.create_user_route(uid, routes)
+    routes = routes_repo.create_user_route(uid, routes) # type: ignore
     return routes
-  
-#maybe should be in protected endpoints 
+
+#maybe should be in protected endpoints
 @app.post("/user_route")
 def get_user_route(user: UserEmailModel):
     s = routes_repo.get_user_route(email=user.email)
