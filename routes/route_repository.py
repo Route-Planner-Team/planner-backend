@@ -36,8 +36,9 @@ class RouteRepository():
         res = self.routes_collection.insert_one(dict(r))
         return r
 
-    def get_user_route(self, email):
-        resp = self.routes_collection.find({"email": email})
+    def get_user_route(self, uid: str):
+        firebase_user = auth.get_user(uid)
+        resp = self.routes_collection.find({"email": firebase_user.email})
         r = []
         for doc in resp:
             del doc['_id']
@@ -45,6 +46,7 @@ class RouteRepository():
             r.append(doc)
         return r
 
-    def delete_user_route(self, email) -> int:
-        resp = self.routes_collection.delete_many({"email": email})
+    def delete_user_route(self, uid) -> int:
+        firebase_user = auth.get_user(uid)
+        resp = self.routes_collection.delete_many({"email": firebase_user.email})
         return resp.deleted_count

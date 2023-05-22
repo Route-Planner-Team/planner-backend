@@ -13,13 +13,9 @@ from fastapi import HTTPException, Request, Depends
 from passlib.context import CryptContext
 from firebase_admin import credentials, auth
 import json
-from typing import Annotated
-
 import config
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-protected_endpoints = ["/protected", "/test", "/auth/change-password", "/routes"]  # add endpoints you want to authorize
-
 
 class UserRepository:
     def __init__(self, config):
@@ -127,25 +123,3 @@ class UserRepository:
                           data=data)
 
         return r.json()
-
-
-    def authenticate_header(request: Request, call_next):
-        """
-        :param request, call_next:
-        :return verify authentication or raise an error:
-        """
-        if any(request.url.path.startswith(endpoint) for endpoint in protected_endpoints):
-            try:
-                auth_header = request.headers.get('Authorization')
-                if not auth_header:
-                    raise NotAuthenticated('Authorization header not found')
-                auth_token = auth_header.split(" ")[1]
-                decoded_token = auth.verify_id_token(auth_token)
-                request.state.uid = decoded_token['uid']
-            except Exception as e:
-                raise NotAuthenticated(str(e))
-            response = call_next(request)
-            return response
-        else:
-            response = call_next(request)
-            return response

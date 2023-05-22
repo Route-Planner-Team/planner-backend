@@ -11,6 +11,7 @@ import googlemaps
 from routes.model import RouteModel, RoutesModel
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
+from users.auth import authenticate_header
 
 cfg = Config()
 
@@ -60,8 +61,8 @@ def change_key_name(dictionary, old_key, new_key):
         dictionary[new_key] = dictionary.pop(old_key)
 
 @app.middleware("http")
-async def firebase_middleware(request: Request, call_next):
-    return await UserRepository.authenticate_header(request, call_next) # type: ignore
+def firebase_middleware(request: Request, call_next):
+    return authenticate_header(request, call_next) # type: ignore
 
 
 @app.get("/")
@@ -161,13 +162,17 @@ def routes_handler(request: Request, routes: RoutesModel):
     routes = routes_repo.create_user_route(uid, routes) # type: ignore
     return routes
 
-#maybe should be in protected endpoints
-@app.post("/user_route")
-def get_user_route(user: UserEmailModel):
-    s = routes_repo.get_user_route(email=user.email)
+@app.get("/user_route")
+@logger.catch
+def get_user_route(request: Request):
+    uid = request.state.uid
+    s = routes_repo.get_user_route(uid=uid)
     return {"Result": s}
 
 @app.delete("/user_route")
-def del_user_route(user: UserModel):
-    count = routes_repo.delete_user_route(email=user.email)
+@logger.catch
+def del_user_route(request: Request):
+    uid = request.state.uid
+    print(uid)
+    count = routes_repo.delete_user_route(uid=uid)
     return {"Deleted": count}

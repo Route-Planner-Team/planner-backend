@@ -8,6 +8,20 @@ from main import routes_repo
 def client():
     return TestClient(app)  # client to test (like app, fast api object, FastApi() )
 
+@pytest.fixture
+def user_data():
+    return {"email": "test_janusz@gmail.com", "password": "asbchvajbhsc"}
+
+@pytest.fixture
+def auth_header(user_data, client):
+    # {'_id': '64660a23b7ab38f24cfd4223', 'email': 'test_janusz@gmail.com', 'uid': 'uub8aAbFW3QFOAi49ql98KfHQIA2'}
+    url = '/auth/sign-in'  # URL edpoint to some handler
+    response = client.post(url, json=user_data).json()
+    auth_token = response['acces_token']
+    headers = {"Authorization": f"Bearer {auth_token}" }
+    return headers
+
+
 def test_route_endpoint(client: TestClient):
     url = '/route'  # URL edpoint to some handler
     data = {
@@ -24,7 +38,7 @@ def test_route_endpoint(client: TestClient):
 
     assert len(route) > 1, "Expected length of route to be greater than 1"
 
-def test_planner_endpoint_one_day(client: TestClient):
+def test_planner_endpoint_one_day(client: TestClient, auth_header):
     url = '/routes'
     data = {
         "depot_address": "Naramowicka 219, 61-611 Poznań",
@@ -37,19 +51,20 @@ def test_planner_endpoint_one_day(client: TestClient):
                     "Jagiellońska 59, 85-027 Bydgoszcz"],
         "days": 2,
         "distance_limit":500,
-        "duration_limit": 100000,
+        "duration_limit": 10000,
         "avg_fuel_consumption": 6,
-        "preferences": "duration"
+        "preferences": "duration",
+        "avoid_tolls": False
     }
 
-    response = client.post(url, json=data)
+    response = client.post(url, json=data, headers=auth_header)
     route = response.json()
 
 
     assert response.status_code == 200
     assert response.content != "null"
 
-def test_save_user_route(client: TestClient):
+def test_save_user_route(client: TestClient, auth_header):
     url = '/routes'
     data = {
         "depot_address": "Naramowicka 219, 61-611 Poznań",
@@ -58,26 +73,23 @@ def test_save_user_route(client: TestClient):
                     "Radłowa 16, 61-602 Poznań",
                     "Zagajnikowa 9, 60-995 Poznań"],
         "days": 1,
-        "distance_limit":30,
-        "duration_limit": 10000,
+        "distance_limit":50,
+        "duration_limit": 1000,
         "avg_fuel_consumption": 6,
         "preferences": "duration",
-        "user_email": "test_user@gmail.com"
+        "user_email": "test_user@gmail.com",
+        "avoid_tolls": False
     }
 
-    response = client.post(url, json=data)
+    response = client.post(url, json=data, headers=auth_header)
     # print(response.json())
 
     assert response.status_code == 200
     assert response.content != "null"
 
-def test_find_user_route_by_email(client: TestClient):
+def test_find_user_route_by_email(client: TestClient, auth_header):
     url = '/user_route'
-    data = {
-        "email": "aaa@gmail.com"
-    }
-
-    response = client.post(url, json=data)
+    response = client.get(url, headers=auth_header)
 
     print(response.json())
     assert response.status_code == 200
