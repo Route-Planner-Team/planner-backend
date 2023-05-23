@@ -5,6 +5,7 @@ from config import Config
 import googlemaps
 import requests
 import polyline
+from math import radians, sin, cos, sqrt, atan2
 
 # Gdy robie from main import gmaps , dostaje Error loading ASGI app. Could not import module "main".
 gmaps = googlemaps.Client(key=Config.GOOGLEMAPS_API_KEY)
@@ -23,6 +24,7 @@ class RoutesPlanner():
         - distance_limit - number of kilometers we can drive in one day (int)
         - duration_limit - number of hours we can drive in one day (int)
         - preferences - can be 'distance' or 'duration', based of that, routes would be chosen by this parameter (str)
+        - avoid_tolls - boolean
         '''
 
         # Function transforms string address of our depot to coordinates
@@ -169,11 +171,33 @@ class RoutesPlanner():
                 lng_center = [p[1] for p in routes[shortest_route][0]]
                 center = (sum(lat_center) / len(routes[0][0]), sum(lng_center) / len(routes[0][0]))
 
+                # Function to calculate distance between 2 coords
+                # Packages which do this, sometimes return an error
+                def calculate_distance(lat1, lon1, lat2, lon2):
+                    earth_radius = 6371.0
+
+                    # Convert the coordinates from degrees to radians
+                    lat1_rad = radians(lat1)
+                    lon1_rad = radians(lon1)
+                    lat2_rad = radians(lat2)
+                    lon2_rad = radians(lon2)
+
+                    # Differences between the coordinates
+                    dlat = lat2_rad - lat1_rad
+                    dlon = lon2_rad - lon1_rad
+
+                    # Haversine formula
+                    a = sin(dlat / 2) ** 2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon / 2) ** 2
+                    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+                    distance = earth_radius * c
+
+                    return distance
+
                 # Find closest point to centroid from longest route
                 min_distance = float('inf')
                 closest_location = None
                 for location in routes[longest_route][0][1:-1]:
-                    distance = geodesic(center, location).kilometers
+                    distance = calculate_distance(center[0], center[1], location[0], location[1])
                     if distance < min_distance:
                         min_distance = distance
                         closest_location = location
@@ -228,16 +252,6 @@ class RoutesPlanner():
             elif preferences == 'duration':
                 routes = choose_min_routes(all_routes, 'duration')
 
-        # Output would be clearer to read
-        # def add_parameter_names_to_output(routes):
-        #     routes_dict = {}
-        #     for key, value in routes.items():
-        #         routes_dict[key] = {
-        #             'coords': value[0],
-        #             'distance_km': value[1],
-        #             'duration_hours': value[2]
-        #         }
-        #     return routes_dict
             def add_parameter_names_to_output(routes):
                 routes_dict = {}
                 for key, value in routes.items():

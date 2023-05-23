@@ -118,7 +118,6 @@ def change_password(request: Request, user: UserModelChangePassword):
     return status
 
 
-# endpoint is protected, so do instructions from line 51
 @app.post("/auth/forgot-password")
 @logger.catch
 def forgot_password(user: UserEmailModel):
