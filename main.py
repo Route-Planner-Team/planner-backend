@@ -137,7 +137,7 @@ def protected_handler(request: Request):
 @app.post("/route")
 @logger.catch
 def route_handler(route: RouteModel):
-    route = routes_planner.calculate_route(route.address) # type: ignore
+    route = routes_planner.calculate_route(route.addresses) # type: ignore
     return route
 
 
@@ -150,7 +150,8 @@ def routes_handler(request: Request, routes: RoutesModel):
         raise NotAuthenticated('User ID not found in token')
 
     routes = routes_planner.get_routes(routes.depot_address,
-                                       routes.address,
+                                       routes.addresses,
+                                       routes.priorities,
                                        routes.days,
                                        routes.distance_limit,
                                        routes.duration_limit,
