@@ -8,7 +8,7 @@ from fastapi_exceptions.exceptions import NotAuthenticated
 from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import credentials, auth
 import googlemaps
-from routes.model import RouteModel, RoutesModel
+from routes.model import RouteModel, RoutesModel, VisitedPointsModel
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
 from users.auth import authenticate_header
@@ -173,6 +173,19 @@ def get_user_route(request: Request):
 @logger.catch
 def del_user_route(request: Request):
     uid = request.state.uid
-    print(uid)
     count = routes_repo.delete_user_route(uid=uid)
     return {"Deleted": count}
+
+
+@app.patch("/user_route")
+@logger.catch
+def patch_user_route(request: Request, dto: VisitedPointsModel, status_code=201):
+    uid = request.state.uid
+    formated_dto =  {
+       "route_id": dto.route_id,
+       "route_point": dto.route_point,
+       "visited": dto.visited,
+       "warnings": dto.warnings
+    }
+    _id = routes_repo.mark_route_points(uid=uid, body=formated_dto)
+    return {"_id": _id}

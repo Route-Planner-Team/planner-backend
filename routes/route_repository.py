@@ -14,6 +14,7 @@ class RouteRepository():
         self.client: MongoClient = MongoClient(self.config.MONGO)
         self.db: Database = self.client.route_db
         self.routes_collection: Collection = self.client.route_db.routes
+        self.visited_collection: Collection = self.client.route_db.visited_points
         logger.info("Inited routes repo")
 
     # documents must have only string keys, key was 0
@@ -41,12 +42,18 @@ class RouteRepository():
         resp = self.routes_collection.find({"email": firebase_user.email})
         r = []
         for doc in resp:
-            del doc['_id']
+            # doc['_id']
             del doc['email']
-            r.append(doc)
+            r.append(str(doc))
+
         return r
 
     def delete_user_route(self, uid) -> int:
         firebase_user = auth.get_user(uid)
         resp = self.routes_collection.delete_many({"email": firebase_user.email})
         return resp.deleted_count
+
+    def mark_route_points(self, uid, body: dict):
+        firebase_user = auth.get_user(uid)
+        resp = self.visited_collection.insert_one(body)
+        return str(resp.inserted_id)
