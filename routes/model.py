@@ -15,3 +15,9 @@ class RoutesModel(BaseModel):
     preferences: constr(regex='^(distance|duration)$')
     avoid_tolls: bool
     user_email: Optional[str] = Field(required=False)
+
+class VisitedPointsModel(BaseModel):
+    route_id: str
+    route_point: list = []
+    visited: bool
+    warnings: Optional[str]
