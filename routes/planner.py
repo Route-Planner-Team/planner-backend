@@ -1,6 +1,5 @@
 import pandas as pd
 from sklearn.cluster import KMeans
-from geopy.distance import geodesic
 from config import Config
 import googlemaps
 import requests
@@ -58,7 +57,7 @@ class RoutesPlanner():
 
         df_addresses = cluster_addresses(df_addresses, days)
 
-        # Add prioritt column
+        # Add priority column
         df_addresses['priority'] = priorities
 
         # Function that prepare centers of p2 and p1
@@ -180,7 +179,7 @@ class RoutesPlanner():
             url = 'https://routes.googleapis.com/directions/v2:computeRoutes'
             headers = {
                 'Content-Type': 'application/json',
-                'X-Goog-Api-Key': 'AIzaSyBG5BufgaHp2Z7u18K5FSrbLOcOeMt0wEw',
+                'X-Goog-Api-Key': Config.GOOGLEMAPS_API_KEY,
                 'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.travelAdvisory.fuelConsumptionMicroliters'
             }
 
@@ -250,7 +249,7 @@ class RoutesPlanner():
             url = 'https://routes.googleapis.com/directions/v2:computeRoutes'
             headers = {
                 'Content-Type': 'application/json',
-                'X-Goog-Api-Key': 'AIzaSyBG5BufgaHp2Z7u18K5FSrbLOcOeMt0wEw',
+                'X-Goog-Api-Key': Config.GOOGLEMAPS_API_KEY,
                 'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.travelAdvisory.fuelConsumptionMicroliters'
             }
 
