@@ -1,11 +1,11 @@
 import pandas as pd
 from sklearn.cluster import KMeans
-from geopy.distance import geodesic
 from config import Config
 import googlemaps
 import requests
 import polyline
 from math import radians, sin, cos, sqrt, atan2
+import json
 
 # Gdy robie from main import gmaps , dostaje Error loading ASGI app. Could not import module "main".
 gmaps = googlemaps.Client(key=Config.GOOGLEMAPS_API_KEY)
@@ -14,16 +14,17 @@ class RoutesPlanner():
     def __init__(self, config):
         self.config = config
 
-    def get_routes(self, depot_address, addresses, days, distance_limit, duration_limit, preferences, avoid_tolls):
+    def get_routes(self, depot_address, addresses, priorities, days, distance_limit, duration_limit, preferences, avoid_tolls):
         '''
         Function generates n routes, returns a dict of all addresses in correct order including depot
         Params:
         - depot address - address of our depot (string)
         - addresses - all addresses we have to visit (list of strings)
+        - priorities - can be 1,2,3. Location with higher priority are firstly visited
         - days - indicates number of routes (int)
         - distance_limit - number of kilometers we can drive in one day (int)
         - duration_limit - number of hours we can drive in one day (int)
-        - preferences - can be 'distance' or 'duration', based of that, routes would be chosen by this parameter (str)
+        - preferences - can be 'distance','duration' or 'fuel', based of that, routes would be chosen by this parameter (str)
         - avoid_tolls - boolean
         '''
 
@@ -53,7 +54,249 @@ class RoutesPlanner():
 
         # For further convenience we put data into pandas DataFrame
         df_addresses = pd.DataFrame(addresses_coords)
+
         df_addresses = cluster_addresses(df_addresses, days)
+
+        # Add priority column
+        df_addresses['priority'] = priorities
+
+        # Function that prepare centers of p2 and p1
+        def prepare_waypoints(p2_addresses, p1_addresses):
+
+            # Create centroid for p2 and p1
+            if len(p2_addresses) >= 1:
+                p2_lat_center = list(map(lambda coord: coord[0], p2_addresses))
+                p2_lng_center = list(map(lambda coord: coord[1], p2_addresses))
+                p2_center = (sum(p2_lat_center) / len(p2_lat_center), sum(p2_lng_center) / len(p2_lng_center))
+            else:
+                p2_center = tuple()
+
+            if len(p1_addresses) >= 1:
+                p1_lat_center = list(map(lambda coord: coord[0], p1_addresses))
+                p1_lng_center = list(map(lambda coord: coord[1], p1_addresses))
+                p1_center = (sum(p1_lat_center) / len(p1_lat_center), sum(p1_lng_center) / len(p1_lng_center))
+            else:
+                p1_center = tuple()
+
+            return p2_center, p1_center
+
+        # Function to order waypoints
+        def set_waypoints(start, addresses, end):
+
+            if avoid_tolls is True:
+                avoid = 'tolls'
+            else:
+                avoid = ''
+
+            # Define waypoints
+            waypoints = [start] + addresses + [end]
+            # Direction from google
+            directions_result = gmaps.directions(waypoints[0],
+                                                 waypoints[-1],
+                                                 waypoints=waypoints[1:-1],
+                                                 mode='driving',
+                                                 optimize_waypoints=True,
+                                                 avoid=avoid)
+
+            # List with ordered addresses indexes
+            optimal_order = directions_result[0]['waypoint_order']
+
+            # List with ordered addresses
+            ordered_addresses = [addresses[i] for i in optimal_order]
+
+            return ordered_addresses
+
+        # Funtion returns correct waypoints order for whole route (all priorities)
+        def get_all_waypoints(priority3_addresses, priority2_addresses, priority1_addresses, depot, p2_center,
+                              p1_center):
+
+            # There are several combinations, number in a string says that there is at least one location with that priority
+            # 321, 32, 31, 3, 21, 2, 1
+            if len(priority3_addresses) >= 1 and len(priority2_addresses) >= 1 and len(priority1_addresses) >= 1:
+                ordered_addresses = []
+                ordered_addresses1 = set_waypoints(depot, priority3_addresses, p2_center)
+                ordered_addresses = ordered_addresses + ordered_addresses1
+
+                ordered_addresses2 = set_waypoints(ordered_addresses[-1], priority2_addresses, p1_center)
+                ordered_addresses = ordered_addresses + ordered_addresses2
+
+                ordered_addresses3 = set_waypoints(ordered_addresses[-1], priority1_addresses, depot)
+                ordered_addresses = ordered_addresses + ordered_addresses3
+
+            if len(priority3_addresses) >= 1 and len(priority2_addresses) >= 1 and len(priority1_addresses) < 1:
+                ordered_addresses = []
+                ordered_addresses1 = set_waypoints(depot, priority3_addresses, p2_center)
+                ordered_addresses = ordered_addresses + ordered_addresses1
+
+                ordered_addresses2 = set_waypoints(ordered_addresses[-1], priority2_addresses, depot)
+                ordered_addresses = ordered_addresses + ordered_addresses2
+
+            if len(priority3_addresses) >= 1 and len(priority2_addresses) < 1 and len(priority1_addresses) >= 1:
+                ordered_addresses = []
+                ordered_addresses1 = set_waypoints(depot, priority3_addresses, p1_center)
+                ordered_addresses = ordered_addresses + ordered_addresses1
+
+                ordered_addresses2 = set_waypoints(ordered_addresses[-1], priority1_addresses, depot)
+                ordered_addresses = ordered_addresses + ordered_addresses2
+
+            if len(priority3_addresses) >= 1 and len(priority2_addresses) < 1 and len(priority1_addresses) < 1:
+                ordered_addresses = []
+                ordered_addresses1 = set_waypoints(depot, priority3_addresses, depot)
+                ordered_addresses = ordered_addresses + ordered_addresses1
+
+            if len(priority3_addresses) < 1 and len(priority2_addresses) >= 1 and len(priority1_addresses) >= 1:
+                ordered_addresses = []
+                ordered_addresses1 = set_waypoints(depot, priority2_addresses, p1_center)
+                ordered_addresses = ordered_addresses + ordered_addresses1
+
+                ordered_addresses2 = set_waypoints(ordered_addresses[-1], priority1_addresses, depot)
+                ordered_addresses = ordered_addresses + ordered_addresses2
+
+            if len(priority3_addresses) < 1 and len(priority2_addresses) >= 1 and len(priority1_addresses) < 1:
+                ordered_addresses = []
+                ordered_addresses1 = set_waypoints(depot, priority2_addresses, depot)
+                ordered_addresses = ordered_addresses + ordered_addresses1
+
+            if len(priority3_addresses) < 1 and len(priority2_addresses) < 1 and len(priority1_addresses) >= 1:
+                ordered_addresses = []
+                ordered_addresses1 = set_waypoints(depot, priority1_addresses, depot)
+                ordered_addresses = ordered_addresses + ordered_addresses1
+
+            return ordered_addresses
+
+        # Function to create intermediates, which will be passed into request
+        def create_json_intermediate(lat, lng):
+            return {"location": {
+                "latLng": {
+                    "latitude": lat,
+                    "longitude": lng
+                }
+            }
+            }
+
+        # Function to create request that will return distance, duration, polyline of whole route
+        def get_distance_duration(waypoints):
+            url = 'https://routes.googleapis.com/directions/v2:computeRoutes'
+            headers = {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': Config.GOOGLEMAPS_API_KEY,
+                'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.travelAdvisory.fuelConsumptionMicroliters'
+            }
+
+            intermediates = []
+            for i in range(1, len(waypoints) - 1):
+                lat, lng = waypoints[i]
+                intermediate = create_json_intermediate(lat, lng)
+                intermediates.append(intermediate)
+
+            if avoid_tolls is True:
+                avoid = True
+            else:
+                avoid = False
+
+            payload = {
+                "origin": {
+                    "location": {
+                        "latLng": {
+                            "latitude": waypoints[0][0],
+                            "longitude": waypoints[0][1]
+                        }
+                    }
+                },
+                "destination": {
+                    "location": {
+                        "latLng": {
+                            "latitude": waypoints[-1][0],
+                            "longitude": waypoints[-1][1]
+                        }
+                    }
+                },
+                "intermediates": intermediates,
+                "routeModifiers": {
+                    "vehicleInfo": {
+                        "emissionType": "GASOLINE"
+                    }
+                },
+
+                "travelMode": "DRIVE",
+                "routingPreference": "TRAFFIC_AWARE_OPTIMAL",
+                "routeModifiers": {
+                    "avoidTolls": avoid
+                },
+                "extraComputations": ["FUEL_CONSUMPTION"]
+            }
+
+            response = requests.post(url, headers=headers, data=json.dumps(payload))
+
+            data = response.json()
+
+            # Take whole distance
+            distance_m = data['routes'][0]['distanceMeters']
+            distance_km = distance_m / 1000
+
+            # Take whole duration
+            duration_string = data['routes'][0]['duration']
+            duration_s = int(duration_string[:-1])
+            duration_h = duration_s / 3600
+
+            # Take polyline
+            poly = data['routes'][0]['polyline']['encodedPolyline']
+
+            return distance_km, duration_h, poly
+
+        # Function to create request that will return fuel consumption between 2 points
+        def get_fuel_between_points(origin, destination):
+            url = 'https://routes.googleapis.com/directions/v2:computeRoutes'
+            headers = {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': Config.GOOGLEMAPS_API_KEY,
+                'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.travelAdvisory.fuelConsumptionMicroliters'
+            }
+
+            if avoid_tolls is True:
+                avoid = True
+            else:
+                avoid = False
+
+            payload = {
+                "origin": {
+                    "location": {
+                        "latLng": {
+                            "latitude": origin[0],
+                            "longitude": origin[1]
+                        }
+                    }
+                },
+                "destination": {
+                    "location": {
+                        "latLng": {
+                            "latitude": destination[0],
+                            "longitude": destination[1]
+                        }
+                    }
+                },
+                "routeModifiers": {
+                    "vehicleInfo": {
+                        "emissionType": "GASOLINE"
+                    }
+                },
+                "travelMode": "DRIVE",
+                "routingPreference": "TRAFFIC_AWARE_OPTIMAL",
+                "routeModifiers": {
+                    "avoidTolls": avoid
+                },
+                "extraComputations": ["FUEL_CONSUMPTION"]
+            }
+
+            response = requests.post(url, headers=headers, data=json.dumps(payload))
+
+            data = response.json()
+
+            # Take fuel in Microliters
+            fuel_micro = data['routes'][0]['travelAdvisory']['fuelConsumptionMicroliters']
+            fuel_liters = int(fuel_micro) / 1000000
+
+            return fuel_liters
 
         # Function takes data in DataFrame format and converted coordinates of our addresses
         # In this function we set optimal order of the waypoints in every route
@@ -66,47 +309,39 @@ class RoutesPlanner():
                 # Convert lat and lng to tuple
                 depot = (depot_address['lat'], depot_address['lng'])
                 df_label = df[df['label'] == label]
-                addresses = list(zip(df_label['lat'], df_label['lng']))
 
-                # Define waypoints
-                waypoints = [depot] + addresses + [depot]
+                # Create datafrme for every priority
+                priority3_df = df_label[df_label['priority'] == 3][['lat', 'lng']]
+                priority2_df = df_label[df_label['priority'] == 2][['lat', 'lng']]
+                priority1_df = df_label[df_label['priority'] == 1][['lat', 'lng']]
 
-                # If user wants to avoid tolls
-                if avoid_tolls is True:
-                    # Direction from google
-                    directions_result = gmaps.directions(waypoints[0],
-                                                         waypoints[-1],
-                                                         waypoints=waypoints[1:-1],
-                                                         mode='driving',
-                                                         avoid='tolls',
-                                                         optimize_waypoints=True)
-                else:
-                    # Direction from google
-                    directions_result = gmaps.directions(waypoints[0],
-                                                         waypoints[-1],
-                                                         waypoints=waypoints[1:-1],
-                                                         mode='driving',
-                                                         optimize_waypoints=True)
+                # Convert dataframe to list
+                priority3_addresses = list(zip(priority3_df['lat'], priority3_df['lng']))
+                priority2_addresses = list(zip(priority2_df['lat'], priority2_df['lng']))
+                priority1_addresses = list(zip(priority1_df['lat'], priority1_df['lng']))
 
-                # List with ordered addresses indexes
-                optimal_order = directions_result[0]['waypoint_order']
+                # Get centers of priority2 and priority1
+                p2_center, p1_center = prepare_waypoints(priority2_addresses, priority1_addresses)
 
-                # List with ordered addresses
-                ordered_addresses = [addresses[i] for i in optimal_order]
+                # Get ordered waypoints for whole route
+                ordered_addresses = get_all_waypoints(priority3_addresses, priority2_addresses, priority1_addresses,
+                                                      depot, p2_center, p1_center)
 
-                # List that contains every location (including depot) in order
-                whole_route = ordered_addresses.copy()
-                whole_route.insert(0, depot)
-                whole_route.append(depot)
+                # Whole route in the correct order, including depot
+                waypoints = [depot] + ordered_addresses + [depot]
 
-                # We want to get distance and duration of a whole route
-                total_distance = 0  # in km
-                total_duration = 0  # in hours
-                for location in range(len(whole_route) - 1):
-                    total_distance = (directions_result[0]['legs'][location]['distance']['value'] / 1000) + total_distance
-                    total_duration = (directions_result[0]['legs'][location]['duration']['value'] / 3600) + total_duration
+                # Calculate distance and duration for whole route
+                total_distance, total_duration, polyline = get_distance_duration(waypoints)
 
-                routes[label] = [whole_route, total_distance, total_duration]
+                # Calculate fuel consumption
+                total_fuel = 0
+                for i in range(len(waypoints) - 1):
+                    origin = waypoints[i]
+                    destination = waypoints[i + 1]
+                    fuel_consumption = get_fuel_between_points(origin, destination)
+                    total_fuel = total_fuel + fuel_consumption
+
+                routes[label] = [waypoints, total_distance, total_duration, total_fuel, polyline]
 
             return routes
 
@@ -128,8 +363,17 @@ class RoutesPlanner():
                 durations.append(routes[duration][2])
             return durations
 
+        # Function take dict with optimized routes
+        # Arranges a list of total fuel consumption
+        def calculate_fuel(routes):
+            fuels = []
+            for fuel in routes:
+                fuels.append(routes[fuel][3])
+            return fuels
+
         distances = calculate_distances(routes)
         durations = calculate_durations(routes)
+        fuels = calculate_fuel(routes)
 
         # Function takes dict with optimized routes and list od total distances
         # In case a route breaks a distance or a duration daily limit we have to rearrange clusters (routes)
@@ -138,7 +382,7 @@ class RoutesPlanner():
 
             # Function take dict with routes
             # Convert data do DataFrame for further set_optimal_waypoints(df, depot_address) usage
-            def routes_to_df(routes):
+            def routes_to_df(routes, df_addresses):
                 df_list = []
                 for key in routes:
                     data = routes[key][0][1:-1]
@@ -147,7 +391,10 @@ class RoutesPlanner():
                                                  'label': key}))
 
                 df = pd.concat(df_list, ignore_index=True)
-                return df
+                # We need to add priority column
+                merged_df = pd.merge(df, df_addresses[['lat', 'lng', 'priority']], on=['lat', 'lng'], how='inner')
+
+                return merged_df
 
             # Function takes dict with optimized routes and list od total distances
             # Function finds a location that will be reclustered
@@ -206,7 +453,7 @@ class RoutesPlanner():
 
             shortest_route, longest_route, location = find_location_to_recluster(routes, distances)
 
-            df = routes_to_df(routes)
+            df = routes_to_df(routes, df_addresses)
 
             # Change the value in column 'label' for a reclustered point
             df.loc[(df['lat'] == location[0]) & (df['lng'] == location[1]), 'label'] = shortest_route
@@ -238,9 +485,14 @@ class RoutesPlanner():
         # Function will choose routes that minimize preference given by user
         def choose_min_routes(all_routes, preference):
             if preference == 'distance':
-                index_of_min_sum = min(range(len(all_routes)), key=lambda i: sum(value[1] for value in all_routes[i].values()))
+                index_of_min_sum = min(range(len(all_routes)),
+                                       key=lambda i: sum(value[1] for value in all_routes[i].values()))
             elif preference == 'duration':
-                index_of_min_sum = min(range(len(all_routes)), key=lambda i: sum(value[2] for value in all_routes[i].values()))
+                index_of_min_sum = min(range(len(all_routes)),
+                                       key=lambda i: sum(value[2] for value in all_routes[i].values()))
+            elif preference == 'fuel':
+                index_of_min_sum = min(range(len(all_routes)),
+                                       key=lambda i: sum(value[3] for value in all_routes[i].values()))
             return all_routes[index_of_min_sum]
 
         # Return routes that minimize given preferences
@@ -251,6 +503,8 @@ class RoutesPlanner():
                 routes = choose_min_routes(all_routes, 'distance')
             elif preferences == 'duration':
                 routes = choose_min_routes(all_routes, 'duration')
+            elif preferences == 'fuel':
+                routes = choose_min_routes(all_routes, 'fuel')
 
             def add_parameter_names_to_output(routes):
                 routes_dict = {}
@@ -258,10 +512,12 @@ class RoutesPlanner():
                     routes_dict[key] = {
                         'coords': value[0],
                         'distance_km': value[1],
-                        'duration_hours': value[2]
+                        'duration_hours': value[2],
+                        'fuel_liters': value[3],
+                        'polyline': value[4]
                     }
                 for key in routes_dict:
-                    routes_dict[key]['coords'] = [[coord[0], coord[1]] for coord in routes_dict[key]['coords']]
+                    routes_dict[key]['coords'] = [{'latitude': coord[0], 'longitude': coord[1]} for coord in routes_dict[key]['coords']]
                 return routes_dict
 
         routes = add_parameter_names_to_output(routes)

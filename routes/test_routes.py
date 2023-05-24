@@ -23,9 +23,9 @@ def auth_header(user_data, client):
 
 
 def test_route_endpoint(client: TestClient):
-    url = '/route'  # URL edpoint to some handler
+    url = '/route'  # URL endpoint to some handler
     data = {
-        "address": [
+        "addresses": [
             "1600 Amphitheatre Parkway, Mountain View, CA",
             "345 Park Ave, San Jose, CA",
             "1 Hacker Way, Menlo Park, CA",
@@ -49,10 +49,10 @@ def test_planner_endpoint_one_day(client: TestClient, auth_header):
                     "Krótka 24, 62-007 Biskupice",
                     "Aleja Jana Pawła II 30, 93-570 Łódź",
                     "Jagiellońska 59, 85-027 Bydgoszcz"],
+        "priorities": [2,1,3,2,1,2,3],
         "days": 2,
         "distance_limit":500,
         "duration_limit": 10000,
-        "avg_fuel_consumption": 6,
         "preferences": "duration",
         "avoid_tolls": False
     }
@@ -72,12 +72,12 @@ def test_save_user_route(client: TestClient, auth_header):
                     "Rubież 14a/37, 61-612 Poznań",
                     "Radłowa 16, 61-602 Poznań",
                     "Zagajnikowa 9, 60-995 Poznań"],
+        "priorities": [3,2,1,2],
         "days": 1,
         "distance_limit":50,
         "duration_limit": 1000,
-        "avg_fuel_consumption": 6,
         "preferences": "duration",
-        "user_email": "test_user@gmail.com",
+        # "user_email": "test_user@gmail.com",
         "avoid_tolls": False
     }
 
