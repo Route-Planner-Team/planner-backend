@@ -41,10 +41,10 @@ class UserRepository:
         )
 
         body['uid'] = firebase_user.uid
-
         del body['password']
-        # user: InsertOneResult = self.users_collection.insert_one(body)
-        # new_user = self.users_collection.find_one({"_id": user.inserted_id})
+
+        user: InsertOneResult = self.users_collection.insert_one(body)
+        new_user = self.users_collection.find_one({"_id": user.inserted_id})
 
         resp = {
             "_id": str(new_user['_id']),
