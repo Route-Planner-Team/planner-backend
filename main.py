@@ -78,6 +78,7 @@ def create_user(user: UserModel, status_code=201):
     """
 
     status = user_repo.create_user(user.dict())
+
     return status
 
 
@@ -94,7 +95,8 @@ def login_user(user: UserModel):
         del firebase_payload['displayName']
         del firebase_payload['registered']
 
-        change_key_name(firebase_payload, "idToken", "acces_token")
+        change_key_name(firebase_payload, "expiresIn", "expires_in")
+        change_key_name(firebase_payload, "idToken", "access_token")
         change_key_name(firebase_payload, "refreshToken", "refresh_token")
 
         return firebase_payload
@@ -115,7 +117,12 @@ def change_password(request: Request, user: UserModelChangePassword):
         raise NotAuthenticated('User ID not found in token')
 
     status = user_repo.change_password(uid, user.dict())
-    return status
+    data ={
+        "user_firebase_id": status._data["localId"],
+        "email": status._data["email"],
+        "password_updated_at": status._data["passwordUpdatedAt"]
+    }
+    return data
 
 
 @app.post("/auth/forgot-password")
@@ -132,7 +139,7 @@ def forgot_password(user: UserEmailModel):
 @app.get("/protected")
 @logger.catch
 def protected_handler(request: Request):
-    return {"user_id" :request.state.uid}
+    return {"user_firebase_id" :request.state.uid}
 
 @app.post("/route")
 @logger.catch
@@ -167,14 +174,14 @@ def routes_handler(request: Request, routes: RoutesModel):
 def get_user_route(request: Request):
     uid = request.state.uid
     s = routes_repo.get_user_route(uid=uid)
-    return {"Result": s}
+    return {"results": s}
 
 @app.delete("/user_route")
 @logger.catch
 def del_user_route(request: Request):
     uid = request.state.uid
     count = routes_repo.delete_user_route(uid=uid)
-    return {"Deleted": count}
+    return {"deleted": count}
 
 
 @app.patch("/user_route")

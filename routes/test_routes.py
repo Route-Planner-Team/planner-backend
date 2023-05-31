@@ -17,7 +17,7 @@ def auth_header(user_data, client):
     # {'_id': '64660a23b7ab38f24cfd4223', 'email': 'test_janusz@gmail.com', 'uid': 'uub8aAbFW3QFOAi49ql98KfHQIA2'}
     url = '/auth/sign-in'  # URL edpoint to some handler
     response = client.post(url, json=user_data).json()
-    auth_token = response['acces_token']
+    auth_token = response['access_token']
     headers = {"Authorization": f"Bearer {auth_token}" }
     return headers
 
@@ -34,7 +34,7 @@ def test_route_endpoint(client: TestClient):
     }
 
     response = client.post(url, json=data)
-    route = response.json().get('route', [])
+    route = response.json().get('coords', [])
 
     assert len(route) > 1, "Expected length of route to be greater than 1"
 
@@ -42,7 +42,7 @@ def test_planner_endpoint_one_day(client: TestClient, auth_header):
     url = '/routes'
     data = {
         "depot_address": "Naramowicka 219, 61-611 Poznań",
-        "address": ["Rubież 46, C3 11, 61-612 Poznań",
+        "addresses": ["Rubież 46, C3 11, 61-612 Poznań",
                     "Rubież 14a/37, 61-612 Poznań",
                     "Radłowa 16, 61-602 Poznań",
                     "Zagajnikowa 9, 60-995 Poznań",
@@ -68,7 +68,7 @@ def test_save_user_route(client: TestClient, auth_header):
     url = '/routes'
     data = {
         "depot_address": "Naramowicka 219, 61-611 Poznań",
-        "address": ["Rubież 46, C3 11, 61-612 Poznań",
+        "addresses": ["Rubież 46, C3 11, 61-612 Poznań",
                     "Rubież 14a/37, 61-612 Poznań",
                     "Radłowa 16, 61-602 Poznań",
                     "Zagajnikowa 9, 60-995 Poznań"],
@@ -77,7 +77,6 @@ def test_save_user_route(client: TestClient, auth_header):
         "distance_limit":50,
         "duration_limit": 1000,
         "preferences": "duration",
-        # "user_email": "test_user@gmail.com",
         "avoid_tolls": False
     }
 
