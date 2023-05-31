@@ -1,3 +1,4 @@
+import sys
 import firebase_admin
 from fastapi import FastAPI, Request
 from users.user_repository import UserRepository
@@ -6,6 +7,7 @@ from loguru import logger
 from config import Config
 from fastapi_exceptions.exceptions import NotAuthenticated
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from firebase_admin import credentials, auth
 import googlemaps
 from routes.model import RouteModel, RoutesModel, VisitedPointsModel
@@ -156,16 +158,21 @@ def routes_handler(request: Request, routes: RoutesModel):
     if uid is None :
         raise NotAuthenticated('User ID not found in token')
 
-    routes = routes_planner.get_routes(routes.depot_address,
-                                       routes.addresses,
-                                       routes.priorities,
-                                       routes.days,
-                                       routes.distance_limit,
-                                       routes.duration_limit,
-                                       routes.preferences,
-                                       routes.avoid_tolls) # type: ignore
+    try:
+        routes = routes_planner.get_routes(routes.depot_address,
+                                           routes.addresses,
+                                           routes.priorities,
+                                           routes.days,
+                                           routes.distance_limit,
+                                           routes.duration_limit,
+                                           routes.preferences,
+                                           routes.avoid_tolls) # type: ignore
 
-    # add logic to add users_route to db
+    except ValueError as e:
+        error = str(e)
+        print(error, file=sys.stderr)
+        return JSONResponse(status_code=400, content={"error": error})
+
     routes = routes_repo.create_user_route(uid, routes) # type: ignore
     return routes
 
