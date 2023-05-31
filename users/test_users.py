@@ -12,7 +12,7 @@ def client():
 
 @pytest.fixture
 def user_data():
-    return {"email": "test_janusz@gmail.com", "password": "asbchvajbhsc"}
+    return {"email": "testowy23@gmail.com", "password": "test123!"}
 
 def test_sign_in(user_data, client):
     # {'_id': '64660a23b7ab38f24cfd4223', 'email': 'test_janusz@gmail.com', 'uid': 'uub8aAbFW3QFOAi49ql98KfHQIA2'}
