@@ -525,13 +525,6 @@ class RoutesPlanner():
         return routes
 
     def calculate_route(self, addresses):
-        # addresses = [
-        #     "1600 Amphitheatre Parkway, Mountain View, CA",
-        #     "345 Park Ave, San Jose, CA",
-        #     "1 Hacker Way, Menlo Park, CA",
-        #     "350 Rhode Island St, San Francisco, CA"
-        # ]
-
         response = requests.get(
             "https://maps.googleapis.com/maps/api/directions/json",
             params={
@@ -545,7 +538,6 @@ class RoutesPlanner():
             return {"error": "Failed to calculate route"}
 
         data = response.json()
-        # print(data)
 
         points = []
 
@@ -561,4 +553,6 @@ class RoutesPlanner():
 
             points.extend(decoded_polyline)
 
-        return {"route": points}
+        converted_points = [{"latitude": point[0], "longitude": point[1]} for point in points]
+
+        return {"coords": converted_points}
