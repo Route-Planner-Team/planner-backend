@@ -450,6 +450,32 @@ class RoutesPlanner():
                                     key=lambda i: sum(value[3] for value in all_routes[i].values()))
         return all_routes[index_of_min_sum]
 
+    # Function adds string address of a location
+    def add_address_name(self, lat, lng):
+        result = gmaps.reverse_geocode((lat, lng))
+        address_components = result[0]['address_components']
+
+        # Values valuable for us
+        route = ''
+        street_number = ''
+        city = ''
+        postal_code = ''
+        country = ''
+        for component in address_components:
+            types = component['types']
+            if 'route' in types:
+                route = component['long_name']
+            if 'street_number' in types:
+                street_number = component['long_name']
+            if 'postal_code' in types:
+                postal_code = component['long_name']
+            if 'locality' in types:
+                city = component['long_name']
+            if 'country' in types:
+                country = component['long_name']
+        address_name = "{} {}, {} {}, {}".format(route, street_number, postal_code, city, country)
+        return address_name
+
     # Function changes names of output values
     def add_parameter_names_to_output(self, routes):
         routes_dict = {}
@@ -462,8 +488,7 @@ class RoutesPlanner():
                 'polyline': value[4]
             }
         for key in routes_dict:
-            routes_dict[key]['coords'] = [{'latitude': coord[0], 'longitude': coord[1]} for coord in
-                                          routes_dict[key]['coords']]
+            routes_dict[key]['coords'] = [{'latitude': coord[0], 'longitude': coord[1], 'name': self.add_address_name(coord[0], coord[1])} for coord in routes_dict[key]['coords']]
         return routes_dict
 
     def get_routes(self, depot_address, addresses, priorities, days, distance_limit, duration_limit, preferences, avoid_tolls):
