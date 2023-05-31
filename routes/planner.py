@@ -522,7 +522,7 @@ class RoutesPlanner():
 
         # Return routes that minimize given preferences
         if len(all_routes) == 0:
-            return ('Can not compute routes for this parameters. Modify parameters.')
+            raise ValueError('Can not compute routes for this parameters. Modify parameters.')
         else:
             if preferences == 'distance':
                 routes = self.choose_min_routes(all_routes, 'distance')
