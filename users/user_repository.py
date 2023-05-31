@@ -40,16 +40,16 @@ class UserRepository:
             password=body['password']
         )
 
-        body['uid'] = firebase_user.uid
+        body['user_firebase_id'] = firebase_user.uid
         del body['password']
 
         user: InsertOneResult = self.users_collection.insert_one(body)
         new_user = self.users_collection.find_one({"_id": user.inserted_id})
 
         resp = {
-            "_id": str(new_user['_id']),
+            "user_mongo_id": str(new_user['_id']),
             "email": new_user['email'],
-            "uid": new_user['uid']
+            "user_firebase_id": new_user['user_firebase_id']
         }
         logger.info(f"Create new user {resp}")
         return resp
@@ -67,7 +67,7 @@ class UserRepository:
 
         user = self.users_collection.find_one({"email": body['email']})
 
-        if user['uid'] != firebase_user.uid:
+        if user['user_firebase_id'] != firebase_user.uid:
             raise ValueError('Firebase UID does not match MongoDB UID')
 
         rest_api_url = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key={config.Config.FIREBASE_API_KEY}"

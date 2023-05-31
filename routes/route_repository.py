@@ -31,7 +31,7 @@ class RouteRepository():
 
     def create_user_route(self, uid: str, body: dict):
         r = self.convert_dict_keys_to_str(body)
-        r['uid'] = uid
+        r['user_firebase_id'] = uid
         firebase_user = auth.get_user(uid)
         r['email'] = firebase_user.email
         res = self.routes_collection.insert_one(dict(r))
@@ -42,8 +42,8 @@ class RouteRepository():
         resp = self.routes_collection.find({"email": firebase_user.email})
         r = []
         for doc in resp:
-            # doc['_id']
-            del doc['email']
+            if '_id' in doc:
+                doc['route_id'] = doc.pop('_id')
             r.append(str(doc))
 
         return r
