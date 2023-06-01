@@ -12,7 +12,7 @@ protected_endpoints = ["/protected",
     "/auth/change-password",
     "/routes",
     "/user_route",
-    "patch_user_route"]  # add endpoints you want to authorize
+    "post_user_route"]  # add endpoints you want to authorize
 
 def authenticate_header(request: Request, call_next):
     """

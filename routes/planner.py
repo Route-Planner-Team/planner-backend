@@ -562,11 +562,14 @@ class RoutesPlanner():
         return routes
 
     def calculate_route(self, addresses):
+        waypoints = addresses[1:-1]
+        waypoint_coordinates = '|via:'.join([','.join(waypoint.split(',')) for waypoint in waypoints])
         response = requests.get(
             "https://maps.googleapis.com/maps/api/directions/json",
             params={
                 "origin": addresses[0],
                 "destination": addresses[-1],
+                "waypoints": "via:" + waypoint_coordinates,
                 "key": self.config.GOOGLEMAPS_API_KEY
             }
         )
@@ -575,6 +578,8 @@ class RoutesPlanner():
             return {"error": "Failed to calculate route"}
 
         data = response.json()
+        # print(data)
+        # print(data['routes'][0]['overview_polyline'])
 
         points = []
 
@@ -586,9 +591,11 @@ class RoutesPlanner():
             tmp_array.append(polyline_str)
 
             decoded_polyline = polyline.decode(polyline_str)
+            #print(decoded_polyline)
 
 
             points.extend(decoded_polyline)
+        # print(''.join(tmp_array))
 
         converted_points = [{"latitude": point[0], "longitude": point[1]} for point in points]
 
