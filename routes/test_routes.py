@@ -10,7 +10,7 @@ def client():
 
 @pytest.fixture
 def user_data():
-    return {"email": "test_janusz@gmail.com", "password": "asbchvajbhsc"}
+    return {"email": "testowy23@gmail.com", "password": "test123!"}
 
 @pytest.fixture
 def auth_header(user_data, client):
@@ -35,6 +35,7 @@ def test_route_endpoint(client: TestClient):
 
     response = client.post(url, json=data)
     route = response.json().get('coords', [])
+    print(route)
 
     assert len(route) > 1, "Expected length of route to be greater than 1"
 
