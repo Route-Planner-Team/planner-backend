@@ -57,3 +57,13 @@ class RouteRepository():
         firebase_user = auth.get_user(uid)
         resp = self.visited_collection.insert_one(body)
         return str(resp.inserted_id)
+
+    def update_document_via_day_id(self, body: dict):
+        filter_query = {"id_of_route_for_special_day": str(body.get('id_of_route_for_special_day'))}
+        document = self.visited_collection.find_one(filter_query)
+        if document:
+            # Update the document with the provided body
+            self.visited_collection.update_one(filter_query, {"$set": body})
+            return document['route_id']
+        else:
+            res = self.visited_collection.insert_one(body)

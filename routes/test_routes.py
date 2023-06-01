@@ -93,16 +93,12 @@ def test_find_user_route_by_email(client: TestClient, auth_header):
     assert response.status_code == 200
 
 
-def test_mark_point(client: TestClient, auth_header):
-    url = '/user_route'
-    #for test use mock route id , but should check into db if route id is valid
+def test_update_user_route_via_day_id():
     body = {
-      "route_id": "646b69ff9fb4819d1a201836",
-      "route_point": [333, 444],
-      "visited": True,
-      "warnings": "wjechalem w kupe, samochod smierdzi"
+        "route_id": "123",
+        "id_of_route_for_special_day": "1",
+        "info_about_points": [[1, 2,True,'abc'], [3,4, False, "qwe"]],
+        "is_this_route_ended": False
     }
-
-    response = client.patch(url=url, headers=auth_header, json=body)
-    # print(response)
-    assert response.status_code == 200
+    res = routes_repo.update_document_via_day_id(body=body)
+    assert res != -1

@@ -17,8 +17,8 @@ class RoutesModel(BaseModel):
     avoid_tolls: bool
     #user_email: Optional[str] = Field(required=False)
 
-class VisitedPointsModel(BaseModel):
+class MarkPointModel(BaseModel):
     route_id: str
-    route_point: list = []
-    visited: bool
-    warnings: Optional[str]
+    id_of_route_for_special_day: str
+    info_about_points: list = []  # list of list
+    is_this_route_ended: bool = False
