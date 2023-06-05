@@ -213,13 +213,13 @@ class RoutesPlanner():
 
         # Take whole duration
         duration_string = data['routes'][0]['duration']
-        duration_s = int(duration_string[:-1])
-        duration_h = duration_s / 3600
+        duration_s = float(duration_string[:-1])
+        duration_min = duration_s / 60
 
         # Take polyline
         poly = data['routes'][0]['polyline']['encodedPolyline']
 
-        return distance_km, duration_h, poly
+        return distance_km, duration_min, poly
 
     # Function to create request that will return fuel consumption between 2 points
     def get_fuel_between_points(self, avoid_tolls, origin, destination):
@@ -483,7 +483,7 @@ class RoutesPlanner():
             routes_dict[key] = {
                 'coords': value[0],
                 'distance_km': value[1],
-                'duration_hours': value[2],
+                'duration_min': value[2],
                 'fuel_liters': value[3],
                 'polyline': value[4]
             }
@@ -499,8 +499,8 @@ class RoutesPlanner():
         - addresses - all addresses we have to visit (list of strings)
         - priorities - can be 1,2,3. Location with higher priority are firstly visited
         - days - indicates number of routes (int)
-        - distance_limit - number of kilometers we can drive in one day (int)
-        - duration_limit - number of hours we can drive in one day (int)
+        - distance_limit - number of kilometers we can drive in one day (float)
+        - duration_limit - number of min we can drive in one day (float)
         - preferences - can be 'distance','duration' or 'fuel', based of that, routes would be chosen by this parameter (str)
         - avoid_tolls - boolean
         '''
