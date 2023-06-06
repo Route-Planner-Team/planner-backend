@@ -10,7 +10,7 @@ def client():
 
 @pytest.fixture
 def user_data():
-    return {"email": "test_janusz@gmail.com", "password": "asbchvajbhsc"}
+    return {"email": "testowy23@gmail.com", "password": "test123!"}
 
 @pytest.fixture
 def auth_header(user_data, client):
