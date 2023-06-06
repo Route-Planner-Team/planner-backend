@@ -563,36 +563,3 @@ class RoutesPlanner():
         routes = self.add_parameter_names_to_output(routes)
 
         return routes
-
-    def calculate_route(self, addresses):
-        response = requests.get(
-            "https://maps.googleapis.com/maps/api/directions/json",
-            params={
-                "origin": addresses[0],
-                "destination": addresses[-1],
-                "key": self.config.GOOGLEMAPS_API_KEY
-            }
-        )
-
-        if response.status_code != 200:
-            return {"error": "Failed to calculate route"}
-
-        data = response.json()
-
-        points = []
-
-        steps = data['routes'][0]['legs'][0]['steps']
-
-        tmp_array = []
-        for step in steps:
-            polyline_str = step['polyline']['points']
-            tmp_array.append(polyline_str)
-
-            decoded_polyline = polyline.decode(polyline_str)
-
-
-            points.extend(decoded_polyline)
-
-        converted_points = [{"latitude": point[0], "longitude": point[1]} for point in points]
-
-        return {"coords": converted_points}

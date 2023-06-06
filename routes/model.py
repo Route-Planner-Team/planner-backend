@@ -1,10 +1,4 @@
 from pydantic import BaseModel, constr, Field
-from typing import Optional
-
-
-class RouteModel(BaseModel):
-    addresses: list = Field([], description="List with 2 addresses in string format, returns route from first to second location")
-
 
 class RoutesModel(BaseModel):
     depot_address: str = Field(..., description="The address of the depot")
