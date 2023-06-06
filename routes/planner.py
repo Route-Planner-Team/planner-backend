@@ -7,6 +7,7 @@ import polyline
 from math import radians, sin, cos, sqrt, atan2
 import json
 import random
+from bson.objectid import ObjectId
 
 gmaps = googlemaps.Client(key=Config.GOOGLEMAPS_API_KEY)
 
@@ -482,13 +483,15 @@ class RoutesPlanner():
         for key, value in routes.items():
             routes_dict[key] = {
                 'coords': value[0],
+                'route_id': str(ObjectId()),
+                'completed': False,
                 'distance_km': value[1],
-                'duration_min': value[2],
+                'duration_hours': value[2] / 60,
                 'fuel_liters': value[3],
                 'polyline': value[4]
             }
         for key in routes_dict:
-            routes_dict[key]['coords'] = [{'latitude': coord[0], 'longitude': coord[1], 'name': self.add_address_name(coord[0], coord[1])} for coord in routes_dict[key]['coords']]
+            routes_dict[key]['coords'] = [{'latitude': coord[0], 'longitude': coord[1], 'name': self.add_address_name(coord[0], coord[1]), 'location_number': i, 'visited': None, 'comment': None} for i, coord in enumerate(routes_dict[key]['coords'])]
         return routes_dict
 
     def get_routes(self, depot_address, addresses, priorities, days, distance_limit, duration_limit, preferences, avoid_tolls):
