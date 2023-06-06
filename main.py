@@ -10,10 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from firebase_admin import credentials, auth
 import googlemaps
-from routes.model import RouteModel, RoutesModel, VisitedPointsModel
+from routes.model import RouteModel, RoutesModel, WaypointModel
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
 from users.auth import authenticate_header
+from bson import ObjectId
 
 cfg = Config()
 
@@ -190,16 +191,23 @@ def del_user_route(request: Request):
     count = routes_repo.delete_user_route(uid=uid)
     return {"deleted": count}
 
-
-@app.patch("/user_route")
+@app.post("/routes/waypoint")
 @logger.catch
-def patch_user_route(request: Request, dto: VisitedPointsModel, status_code=201):
+def mark_visited_waypoint(request: Request, waypoint: WaypointModel):
     uid = request.state.uid
-    formated_dto =  {
-       "route_id": dto.route_id,
-       "route_point": dto.route_point,
-       "visited": dto.visited,
-       "warnings": dto.warnings
-    }
-    _id = routes_repo.mark_route_points(uid=uid, body=formated_dto)
-    return {"_id": _id}
+    if uid is None:
+        raise NotAuthenticated('User ID not found in token')
+    try:
+        updated_waypoint = routes_repo.update_waypoint(waypoint.routes_id,
+                                             waypoint.route_id,
+                                             waypoint.location_number,
+                                             waypoint.visited,
+                                             waypoint.comment)
+
+        return updated_waypoint
+
+    except ValueError as e:
+        error = str(e)
+        print(error, file=sys.stderr)
+        return JSONResponse(status_code=400, content={"error": error})
+

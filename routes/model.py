@@ -16,8 +16,9 @@ class RoutesModel(BaseModel):
     preferences: constr(regex='^(distance|duration|fuel)$') = Field(..., description="Preferences")
     avoid_tolls: bool = Field(..., description="Whether to avoid tolls")
 
-class VisitedPointsModel(BaseModel):
-    route_id: str
-    route_point: list = []
-    visited: bool
-    warnings: Optional[str]
+class WaypointModel(BaseModel):
+    routes_id: str = Field(..., description="Generated id for all routes")
+    route_id: str = Field(..., description="Generated id of a single route")
+    location_number: int = Field(..., description="Number for a  waypoint in a route")
+    visited: bool = Field(..., description="True if visited, False if not")
+    comment: str = Field(..., description="Comment for a waypoint")
