@@ -1,6 +1,7 @@
 import sys
 
 import firebase_admin
+from firebase_admin.auth import EmailAlreadyExistsError
 import googlemaps
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -81,9 +82,12 @@ def create_user(user: UserModel, status_code=201):
     Handler to create user
     """
 
-    status = user_repo.create_user(user.dict())
-
-    return status
+    try:
+        status = user_repo.create_user(user.dict())
+        return status
+    except EmailAlreadyExistsError as e:
+        error_message = str(e)
+        return {'error': error_message}
 
 
 @app.post("/auth/sign-in")
@@ -105,8 +109,12 @@ def login_user(user: UserModel):
 
         return firebase_payload
 
+    except ValueError as e:
+        error_message = str(e)
+        return {'error': error_message}
+
     except NotAuthenticated:
-        return {"Message": "Auth failed!"}
+        return {"error": "Auth failed!"}
 
 
 @app.post("/auth/change-password")
@@ -120,13 +128,18 @@ def change_password(request: Request, user: UserModelChangePassword):
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
 
-    status = user_repo.change_password(uid, user.dict())
-    data ={
-        "user_firebase_id": status._data["localId"],
-        "email": status._data["email"],
-        "password_updated_at": status._data["passwordUpdatedAt"]
-    }
-    return data
+    try:
+        status = user_repo.change_password(uid, user.dict())
+        data ={
+            "user_firebase_id": status._data["localId"],
+            "email": status._data["email"],
+            "password_updated_at": status._data["passwordUpdatedAt"]
+        }
+        return data
+
+    except ValueError as e:
+        error_message = str(e)
+        return {'error': error_message}
 
 
 @app.post("/auth/forgot-password")
@@ -136,18 +149,20 @@ def forgot_password(user: UserEmailModel):
     Handler to change password for not logged in user
     """
 
-    status = user_repo.forgot_password(user.dict())
-    return status
+    try:
+        status = user_repo.forgot_password(user.dict())
+        return status
+
+    except ValueError as e:
+        error_message = str(e)
+        return {'error': error_message}
 
 
 @app.get("/routes")
 @logger.catch
 def routes_get_handler(request: Request):
-    """Return all routes for current user
-    Raises:
-        NotAuthenticated
-    Returns:
-        all routes for current user
+    """
+    Return all routes for current user (completed and uncompleted)
     """
 
     uid = request.state.uid
@@ -156,7 +171,29 @@ def routes_get_handler(request: Request):
 
     res = routes_repo.get_user_route(uid=uid)
 
-    return {"Result": res}
+    if len(res) == 0:
+        return {'message': 'No routes for that user'}
+
+    return res
+
+
+@app.get("/routes/active")
+@logger.catch
+def active_routes_handler(request: Request):
+    """
+    Return routes for current user, where completed is false (returns active routes to visit)
+    """
+
+    uid = request.state.uid
+    if uid is None:
+        raise NotAuthenticated('User ID not found in token')
+
+    res = routes_repo.get_user_route(uid=uid, active=True)
+
+    if len(res) == 0:
+        return {'message': 'No active routes for that user'}
+
+    return res
 
 
 @app.post("/routes")
@@ -178,8 +215,8 @@ def routes_post_handler(request: Request, routes: RoutesModel):
         error = str(e)
         return JSONResponse(status_code=400, content={"error": error})
 
-
     return routes
+
 
 @app.delete("/routes")
 @logger.catch
@@ -195,23 +232,9 @@ def del_user_route(request: Request):
     uid = request.state.uid
     if uid is None :
         raise NotAuthenticated('User ID not found in token')
+
     count = routes_repo.delete_user_route(uid=uid)
-    return {"Deleted": count}
-
-
-@app.get("/routes/active")
-@logger.catch
-def active_routes_handler(request: Request):
-    """
-    Return all routes for current user, where visited is false (active routes to visit)
-    """
-
-    uid = request.state.uid
-    if uid is None :
-        raise NotAuthenticated('User ID not found in token')
-
-    res = routes_repo.get_user_route(uid=uid, active=True)
-    return {"Result": res}
+    return {"deleted": count}
 
 
 @app.post("/routes/waypoint")
@@ -221,11 +244,11 @@ def mark_visited_waypoint(request: Request, waypoint: WaypointModel):
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
     try:
-        updated_waypoint = routes_repo.update_waypoint(waypoint._id,
-                                             waypoint.route_id,
-                                             waypoint.location_number,
-                                             waypoint.visited,
-                                             waypoint.comment)
+        updated_waypoint = routes_repo.update_waypoint(waypoint.routes_id,
+                                                       waypoint.route_id,
+                                                       waypoint.location_number,
+                                                       waypoint.visited,
+                                                       waypoint.comment)
 
         return updated_waypoint
 

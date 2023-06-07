@@ -27,29 +27,18 @@ class UserRepository:
 
     def create_user(self, body: dict) -> dict:
         """
-        Create user's document in mongoDB
         :param body: example {"email": "abc@gmail.com", "password": "qwe123"}
         :return: dict
         """
-
-        # if self.users_collection.find_one({"email": body['email']}):
-        #     raise HTTPException(status_code=404, detail="User with this email already exists")
 
         firebase_user = auth.create_user(
             email=body['email'],
             password=body['password']
         )
 
-        body['user_firebase_id'] = firebase_user.uid
-        del body['password']
-
-        user: InsertOneResult = self.users_collection.insert_one(body)
-        new_user = self.users_collection.find_one({"_id": user.inserted_id})
-
         resp = {
-            "user_mongo_id": str(new_user['_id']),
-            "email": new_user['email'],
-            "user_firebase_id": new_user['user_firebase_id']
+            "email": firebase_user.email,
+            "user_firebase_id": firebase_user.uid
         }
         logger.info(f"Create new user {resp}")
         return resp
@@ -60,7 +49,6 @@ class UserRepository:
         :return: dict
         """
 
-        # firebase_user = auth.get_user_by_email(body['email'])
         firebase_request_url = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key={config.Config.FIREBASE_API_KEY}"
         payload = json.dumps({
             'email': body['email'],
@@ -103,14 +91,20 @@ class UserRepository:
         :return: dict
         """
 
-        if not self.users_collection.find_one({"email": body['email']}):
-            raise HTTPException(status_code=404, detail="No user with that email address")
-
         rest_api_url = "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode"
         data = {"requestType": "PASSWORD_RESET", "email": body['email']}
 
         r = requests.post(rest_api_url,
                           params={'key': config.Config.FIREBASE_API_KEY},
                           data=data)
+
+        response = r.json()
+
+        if 'error' in response:
+            error_message = response['error']['message']
+            if error_message == 'EMAIL_NOT_FOUND':
+                raise ValueError('Email not found')
+            else:
+                raise ValueError('An error occurred')
 
         return r.json()

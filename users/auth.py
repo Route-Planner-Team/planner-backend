@@ -7,12 +7,11 @@ from fastapi import HTTPException, Request, Depends
 from fastapi_exceptions.exceptions import NotAuthenticated
 from firebase_admin import auth
 
-protected_endpoints = ["/protected",
-    "/test",
+protected_endpoints = [
     "/auth/change-password",
     "/routes",
-    "/user_route",
-    "patch_user_route",
+    "/routes/active",
+    "/routes/waypoint"
     ]  # add endpoints you want to authorize
 
 def authenticate_header(request: Request, call_next):

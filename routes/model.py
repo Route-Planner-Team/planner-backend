@@ -11,7 +11,7 @@ class RoutesModel(BaseModel):
     avoid_tolls: bool = Field(..., description="Whether to avoid tolls")
 
 class WaypointModel(BaseModel):
-    _id: str = Field(..., description="Database id for route document")
+    routes_id: str = Field(..., description="Database id for routes document")
     route_id: str = Field(..., description="Generated id of a single route")
     location_number: int = Field(..., description="Number for a  waypoint in a route")
     visited: bool = Field(..., description="True if visited, False by default")

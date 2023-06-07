@@ -17,7 +17,7 @@ def user_data():
 @pytest.fixture
 def auth_header(user_data, client):
     # {'_id': '64660a23b7ab38f24cfd4223', 'email': 'test_janusz@gmail.com', 'uid': 'uub8aAbFW3QFOAi49ql98KfHQIA2'}
-    url = '/auth/sign-in'  # URL edpoint to some handler
+    url = '/auth/sign-in'  # URL endpoint to some handler
     response = client.post(url, json=user_data).json()
     auth_token = response['access_token']
     headers = {"Authorization": f"Bearer {auth_token}" }

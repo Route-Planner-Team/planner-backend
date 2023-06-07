@@ -16,7 +16,7 @@ def user_data():
     return {"email": "testowy23@gmail.com", "password": "test123!"}
 
 def test_sign_in(user_data, client):
-    url = '/auth/sign-in'  # URL edpoint to some handler
+    url = '/auth/sign-in'  # URL endpoint to some handler
     response = client.post(url, json=user_data).json()
     auth_token = response['access_token']
     assert auth_token
