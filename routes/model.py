@@ -1,10 +1,4 @@
 from pydantic import BaseModel, constr, Field
-from typing import Optional
-
-
-class RouteModel(BaseModel):
-    addresses: list = Field([], description="List with 2 addresses in string format, returns route from first to second location")
-
 
 class RoutesModel(BaseModel):
     depot_address: str = Field(..., description="The address of the depot")
@@ -17,8 +11,8 @@ class RoutesModel(BaseModel):
     avoid_tolls: bool = Field(..., description="Whether to avoid tolls")
 
 class WaypointModel(BaseModel):
-    routes_id: str = Field(..., description="Generated id for all routes")
+    _id: str = Field(..., description="Database id for route document")
     route_id: str = Field(..., description="Generated id of a single route")
     location_number: int = Field(..., description="Number for a  waypoint in a route")
-    visited: bool = Field(..., description="True if visited, False if not")
+    visited: bool = Field(..., description="True if visited, False by default")
     comment: str = Field(..., description="Comment for a waypoint")

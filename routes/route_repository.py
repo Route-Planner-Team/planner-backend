@@ -1,13 +1,12 @@
+from bson import json_util
 from bson.objectid import ObjectId
+from firebase_admin import auth, credentials
 from loguru import logger
+from passlib.context import CryptContext
 from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo.database import Database
-from passlib.context import CryptContext
-from firebase_admin import credentials, auth
 from pymongo.results import InsertOneResult
-import json
-from bson import json_util
 
 
 class RouteRepository():
@@ -33,7 +32,6 @@ class RouteRepository():
 
     def create_user_route(self, uid: str, body: dict):
         r = self.convert_dict_keys_to_str(body)
-
         r['user_firebase_id'] = uid
         firebase_user = auth.get_user(uid)
 
@@ -41,29 +39,41 @@ class RouteRepository():
 
         res = self.routes_collection.insert_one(dict(r))
 
-        r['routes_id'] = str(res.inserted_id)
+        r['_id'] = str(res.inserted_id)
 
         return r
 
-    def get_user_route(self, uid: str):
-        firebase_user = auth.get_user(uid)
-        resp = self.routes_collection.find({"email": firebase_user.email})
-        r = []
-        for doc in resp:
-            if '_id' in doc:
-                doc['routes_id'] = doc.pop('_id')
-            r.append(str(doc))
+    def get_user_route(self, uid: str, active=False):
+        resp = self.routes_collection.find({"user_firebase_id": uid})
 
-        return r
+        if active is True:
+            # TODO , tu powinno być to zapytanie do mongo, gdzie completed is true
+            #             resp=db.routes.find({
+            # "coords": {
+            #     completed: false
+            # },
+            # "user_firebase_id": "some firebase user id"
+            # });
+            #
+            # TODO
+            pass
+
+        # delete private fields
+        keys_to_remove = ['user_firebase_id', 'email']
+        filtered_documents = []
+        for document in resp:
+            filtered_document = {key: value for key, value in document.items() if key not in keys_to_remove}
+            filtered_documents.append(filtered_document)
+
+        return filtered_documents
 
     def delete_user_route(self, uid) -> int:
-        firebase_user = auth.get_user(uid)
-        resp = self.routes_collection.delete_many({"email": firebase_user.email})
+        resp = self.routes_collection.delete_many({"user_firebase_id": uid})
         return resp.deleted_count
 
-    def update_waypoint(self, routes_id: str, route_id: str, location_number: int, visited: bool, comment: str):
+    def update_waypoint(self, _id: str, route_id: str, location_number: int, visited: bool, comment: str):
         # Get right routes document
-        routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
+        routes = self.routes_collection.find_one({"_id": ObjectId(_id)})
         route = []
         for key, value in routes.items():
             if isinstance(value, dict):
@@ -88,6 +98,11 @@ class RouteRepository():
         route[0][1]['completed'] = all_visited
 
         # Update document in mongo
-        self.routes_collection.replace_one({"_id": ObjectId(routes_id)}, routes)
+        self.routes_collection.replace_one({"_id": ObjectId(_id)}, routes)
 
-        return {'routes_id': routes_id, 'route_id': route_id, 'location_number': location_number, 'visited': visited, 'comment': comment, 'whole_route_completed': all_visited}
+        return {'routes_id': _id,
+                'route_id': route_id,
+                'location_number': location_number,
+                'visited': visited,
+                'comment': comment,
+                'whole_route_completed': all_visited}

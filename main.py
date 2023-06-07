@@ -1,20 +1,21 @@
 import sys
+
 import firebase_admin
+import googlemaps
 from fastapi import FastAPI, Request
-from users.user_repository import UserRepository
-from users.model import UserModel, UserModelChangePassword, UserEmailModel
-from loguru import logger
-from config import Config
-from fastapi_exceptions.exceptions import NotAuthenticated
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from firebase_admin import credentials, auth
-import googlemaps
-from routes.model import RouteModel, RoutesModel, WaypointModel
+from fastapi_exceptions.exceptions import NotAuthenticated
+from firebase_admin import credentials
+from loguru import logger
+
+from config import Config
+from routes.model import RoutesModel, WaypointModel
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
 from users.auth import authenticate_header
-from bson import ObjectId
+from users.model import UserEmailModel, UserModel, UserModelChangePassword
+from users.user_repository import UserRepository
 
 cfg = Config()
 
@@ -139,26 +140,29 @@ def forgot_password(user: UserEmailModel):
     return status
 
 
-@app.get("/protected")
+@app.get("/routes")
 @logger.catch
-def protected_handler(request: Request):
-    return {"user_firebase_id" :request.state.uid}
+def routes_get_handler(request: Request):
+    """Return all routes for current user
+    Raises:
+        NotAuthenticated
+    Returns:
+        all routes for current user
+    """
 
-@app.post("/route")
-@logger.catch
-def route_handler(route: RouteModel):
-    route = routes_planner.calculate_route(route.addresses) # type: ignore
-    return route
-
-
-# endpoint is protected, so do instructions from line 51
-@app.post("/routes")
-@logger.catch
-def routes_handler(request: Request, routes: RoutesModel):
     uid = request.state.uid
     if uid is None :
         raise NotAuthenticated('User ID not found in token')
 
+    res = routes_repo.get_user_route(uid=uid)
+
+    return {"Result": res}
+
+
+@app.post("/routes")
+@logger.catch
+def routes_post_handler(request: Request, routes: RoutesModel):
+    uid = request.state.uid
     try:
         routes = routes_planner.get_routes(routes.depot_address,
                                            routes.addresses,
@@ -167,29 +171,48 @@ def routes_handler(request: Request, routes: RoutesModel):
                                            routes.distance_limit,
                                            routes.duration_limit,
                                            routes.preferences,
-                                           routes.avoid_tolls) # type: ignore
+                                           routes.avoid_tolls)
+        routes = routes_repo.create_user_route(uid, routes)
 
     except ValueError as e:
         error = str(e)
-        print(error, file=sys.stderr)
         return JSONResponse(status_code=400, content={"error": error})
 
-    routes = routes_repo.create_user_route(uid, routes) # type: ignore
+
     return routes
 
-@app.get("/user_route")
-@logger.catch
-def get_user_route(request: Request):
-    uid = request.state.uid
-    s = routes_repo.get_user_route(uid=uid)
-    return {"results": s}
-
-@app.delete("/user_route")
+@app.delete("/routes")
 @logger.catch
 def del_user_route(request: Request):
+    """Delete all routes for current user
+    Raises:
+        NotAuthenticated
+
+    Returns:
+        Deleted int
+    """
+
     uid = request.state.uid
+    if uid is None :
+        raise NotAuthenticated('User ID not found in token')
     count = routes_repo.delete_user_route(uid=uid)
-    return {"deleted": count}
+    return {"Deleted": count}
+
+
+@app.get("/routes/active")
+@logger.catch
+def active_routes_handler(request: Request):
+    """
+    Return all routes for current user, where visited is false (active routes to visit)
+    """
+
+    uid = request.state.uid
+    if uid is None :
+        raise NotAuthenticated('User ID not found in token')
+
+    res = routes_repo.get_user_route(uid=uid, active=True)
+    return {"Result": res}
+
 
 @app.post("/routes/waypoint")
 @logger.catch
@@ -198,7 +221,7 @@ def mark_visited_waypoint(request: Request, waypoint: WaypointModel):
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
     try:
-        updated_waypoint = routes_repo.update_waypoint(waypoint.routes_id,
+        updated_waypoint = routes_repo.update_waypoint(waypoint._id,
                                              waypoint.route_id,
                                              waypoint.location_number,
                                              waypoint.visited,
@@ -210,4 +233,3 @@ def mark_visited_waypoint(request: Request, waypoint: WaypointModel):
         error = str(e)
         print(error, file=sys.stderr)
         return JSONResponse(status_code=400, content={"error": error})
-
