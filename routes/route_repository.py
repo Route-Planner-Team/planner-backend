@@ -39,12 +39,24 @@ class RouteRepository():
 
         res = self.routes_collection.insert_one(dict(r))
 
-        r['routes_id'] = str(res.inserted_id)
+        r['_id'] = str(res.inserted_id)
 
         return r
 
-    def get_user_route(self, uid: str):
+    def get_user_route(self, uid: str, active=False):
         resp = self.routes_collection.find({"user_firebase_id": uid})
+
+        if active is True:
+            # TODO , tu powinno być to zapytanie do mongo, gdzie completed is true
+            #             resp=db.routes.find({
+            # "coords": {
+            #     completed: false
+            # },
+            # "user_firebase_id": "some firebase user id"
+            # });
+            #
+            # TODO
+            pass
 
         # delete private fields
         keys_to_remove = ['user_firebase_id', 'email']
@@ -59,9 +71,9 @@ class RouteRepository():
         resp = self.routes_collection.delete_many({"user_firebase_id": uid})
         return resp.deleted_count
 
-    def update_waypoint(self, routes_id: str, route_id: str, location_number: int, visited: bool, comment: str):
+    def update_waypoint(self, _id: str, route_id: str, location_number: int, visited: bool, comment: str):
         # Get right routes document
-        routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
+        routes = self.routes_collection.find_one({"_id": ObjectId(_id)})
         route = []
         for key, value in routes.items():
             if isinstance(value, dict):
@@ -86,6 +98,11 @@ class RouteRepository():
         route[0][1]['completed'] = all_visited
 
         # Update document in mongo
-        self.routes_collection.replace_one({"_id": ObjectId(routes_id)}, routes)
+        self.routes_collection.replace_one({"_id": ObjectId(_id)}, routes)
 
-        return {'routes_id': routes_id, 'route_id': route_id, 'location_number': location_number, 'visited': visited, 'comment': comment, 'whole_route_completed': all_visited}
+        return {'routes_id': _id,
+                'route_id': route_id,
+                'location_number': location_number,
+                'visited': visited,
+                'comment': comment,
+                'whole_route_completed': all_visited}

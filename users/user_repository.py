@@ -60,24 +60,15 @@ class UserRepository:
         :return: dict
         """
 
-        if not self.users_collection.find_one({"email": body['email']}):
-            raise HTTPException(status_code=404, detail="No user with that email address")
-
-        firebase_user = auth.get_user_by_email(body['email'])
-
-        user = self.users_collection.find_one({"email": body['email']})
-
-        if user['user_firebase_id'] != firebase_user.uid:
-            raise ValueError('Firebase UID does not match MongoDB UID')
-
-        rest_api_url = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key={config.Config.FIREBASE_API_KEY}"
+        # firebase_user = auth.get_user_by_email(body['email'])
+        firebase_request_url = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key={config.Config.FIREBASE_API_KEY}"
         payload = json.dumps({
             'email': body['email'],
             'password': body['password'],
             "returnSecureToken": True
         })
 
-        r = requests.post(rest_api_url,data=payload)
+        r = requests.post(firebase_request_url,data=payload)
 
         response = r.json()
 

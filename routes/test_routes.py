@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from main import app, routes_planner, routes_repo
 
 
+# Fixtury dla testow integracyjnych
 @pytest.fixture
 def client():
     return TestClient(app)  # client to test (like app, fast api object, FastApi() )
@@ -22,39 +23,7 @@ def auth_header(user_data, client):
     headers = {"Authorization": f"Bearer {auth_token}" }
     return headers
 
-# INTEGRATION TESTS
-@pytest.mark.skip(reason="Integration test with db")
-def test_get_routes_integrate(client: TestClient, auth_header):
-    routes = {
-        "depot_address": "Naramowicka 219, 61-611 Poznań",
-        "addresses": ["Rubież 46, C3 11, 61-612 Poznań",
-                    "Rubież 14a/37, 61-612 Poznań",
-                    "Radłowa 16, 61-602 Poznań",
-                    "Zagajnikowa 9, 60-995 Poznań",
-                    "Krótka 24, 62-007 Biskupice",
-                    "Aleja Jana Pawła II 30, 93-570 Łódź",
-                    "Jagiellońska 59, 85-027 Bydgoszcz"],
-        "priorities": [2,1,3,2,1,2,3],
-        "days": 1,
-        "distance_limit":1000,
-        "duration_limit": 1000,
-        "preferences": "duration",
-        "avoid_tolls": False
-    }
-    url = '/routes'
-    response = client.post(url, json=routes, headers=auth_header)
-
-    assert response
-
-
-@pytest.mark.skip(reason="Integration test with db")
-def test_get_routes_integrate(client: TestClient, auth_header):
-    url = '/routes'
-    response = client.get(url=url, headers=auth_header)
-    assert response
-    assert len(response) > 1
-
-
+# Unit testy na algorythm planowanie trasy
 def test_get_routes():
     routes = {
         "depot_address": "Naramowicka 219, 61-611 Poznań",
@@ -72,6 +41,26 @@ def test_get_routes():
         "preferences": "duration",
         "avoid_tolls": False
     }
+
+    # test data to generate route for 3 days and with other address
+    # routes = {
+    #     "depot_address": "Opieńskiego 1, 60-685 Poznań",
+    #     "addresses": ["Młyńska 7, 64-600 Oborniki",
+    #                 "Al. Wojska Polskiego 1, 85-171 Bydgoszcz",
+    #                 "Broniewskiego 90, 87-100 Toruń",
+    #                 "Kilińskiego 3, 87-800 Włocławek",
+    #                 "Budowlanych 1, 63-400 Ostrów Wielkopolski",
+    #                 "Aleja Jana Pawła II 30, 93-570 Łódź",
+    #                 "Jagiellońska 59, 85-027 Bydgoszcz",
+    #                 "Głogowska 432, 60-004 Poznań"],
+    #     "priorities": [2,1,3,2,1,2,3,2],
+    #     "days": 3,
+    #     "distance_limit":1000,
+    #     "duration_limit": 1000,
+    #     "preferences": "duration",
+    #     "avoid_tolls": False
+    # }
+
     route = routes_planner.get_routes(routes['depot_address'],
                                            routes['addresses'],
                                            routes['priorities'],
