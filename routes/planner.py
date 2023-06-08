@@ -483,7 +483,6 @@ class RoutesPlanner():
         for key, value in routes.items():
             routes_dict[key] = {
                 'coords': value[0],
-                'route_id': str(ObjectId()),
                 'completed': False,
                 'distance_km': value[1],
                 'duration_hours': value[2] / 60,

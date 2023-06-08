@@ -31,17 +31,20 @@ class RouteRepository():
             return dictionary
 
     def create_user_route(self, uid: str, body: dict):
-        r = self.convert_dict_keys_to_str(body)
-        r['user_firebase_id'] = uid
         firebase_user = auth.get_user(uid)
 
-        r['email'] = firebase_user.email
+        document = self.convert_dict_keys_to_str(body)
 
-        res = self.routes_collection.insert_one(dict(r))
+        all_docs = {}
 
-        r['routes_id'] = str(res.inserted_id)
+        for key, value in document.items():
+            value['user_firebase_id'] = uid
+            value['email'] = firebase_user.email
+            res = self.routes_collection.insert_one(dict(value))
+            value['route_id'] = str(res.inserted_id)
+            all_docs[key] = value
 
-        return r
+        return all_docs
 
     def get_user_route(self, uid: str, active=False):
         cursor = self.routes_collection.find({"user_firebase_id": uid})
@@ -50,18 +53,16 @@ class RouteRepository():
         all_routes = []
 
         for document in documents:
-            for key, value in document.items():
-                if isinstance(value, dict):
-                    route = value
-                    route['routes_id'] = str(document['_id'])  # we need that, because it is passed in update_waypoint
-                    all_routes.append(route)
-
-        all_routes_as_dict = {str(i): d for i, d in enumerate(all_routes)}
+            document['route_id'] = str(document.pop('_id'))
+            all_routes.append(document)
 
         # Returns routes where completed is False
         if active is True:
-            active_routes = {key: value for key, value in all_routes_as_dict.items() if value.get('completed') is False}
+            active_routes = {str(i): value for i, value in enumerate(all_routes) if value.get('completed') is False}
+            active_routes = {str(i): value for i, (key, value) in enumerate(active_routes.items())}
             return active_routes
+
+        all_routes_as_dict = {str(i): value for i, value in enumerate(all_routes)}
 
         # Returns all routes no matter if completed is False or True
         return all_routes_as_dict
@@ -70,37 +71,25 @@ class RouteRepository():
         resp = self.routes_collection.delete_many({"user_firebase_id": uid})
         return resp.deleted_count
 
-    def update_waypoint(self, routes_id: str, route_id: str, location_number: int, visited: bool, comment: str):
+    def update_waypoint(self, route_id: str, location_number: int, visited: bool, comment: str):
         # Get right routes document
-        routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
-        route = []
-        for key, value in routes.items():
-            if isinstance(value, dict):
-                if 'route_id' in value and value['route_id'] == route_id:
-                    route.append((key, value))
-            elif isinstance(value, list):
-                for item in value:
-                    if isinstance(item, dict) and 'route_id' in item and item['route_id'] == route_id:
-                        route.append((key, item))
+        route = self.routes_collection.find_one({"_id": ObjectId(route_id)})
 
-        # Pass visited and comment into right route
-        for key, value in dict(route).items():
-            if isinstance(value, dict):
-                if 'coords' in value and isinstance(value['coords'], list):
-                    for item in value['coords']:
-                        if 'location_number' in item and item['location_number'] == location_number:
-                            item['visited'] = visited
-                            item['comment'] = comment
+        # Pass visited and comment into route
+        if 'coords' in route and isinstance(route['coords'], list):
+            for item in route['coords']:
+                if 'location_number' in item and item['location_number'] == location_number:
+                    item['visited'] = visited
+                    item['comment'] = comment
 
         # Check if in all location there is True or False value
-        all_visited = all(item['visited'] in [True, False] for item in route[0][1]['coords'])
-        route[0][1]['completed'] = all_visited
+        all_visited = all(item['visited'] in [True, False] for item in route['coords'])
+        route['completed'] = all_visited
 
         # Update document in mongo
-        self.routes_collection.replace_one({"_id": ObjectId(routes_id)}, routes)
+        self.routes_collection.replace_one({"_id": ObjectId(route_id)}, route)
 
-        return {'routes_id': routes_id,
-                'route_id': route_id,
+        return {'route_id': route_id,
                 'location_number': location_number,
                 'visited': visited,
                 'comment': comment,
