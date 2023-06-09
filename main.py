@@ -166,7 +166,7 @@ def routes_get_handler(request: Request):
     """
 
     uid = request.state.uid
-    if uid is None :
+    if uid is None:
         raise NotAuthenticated('User ID not found in token')
 
     res = routes_repo.get_user_route(uid=uid)
@@ -209,6 +209,7 @@ def routes_post_handler(request: Request, routes: RoutesModel):
                                            routes.duration_limit,
                                            routes.preferences,
                                            routes.avoid_tolls)
+
         routes = routes_repo.create_user_route(uid, routes)
 
     except ValueError as e:
@@ -244,8 +245,7 @@ def mark_visited_waypoint(request: Request, waypoint: WaypointModel):
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
     try:
-        updated_waypoint = routes_repo.update_waypoint(waypoint.routes_id,
-                                                       waypoint.route_id,
+        updated_waypoint = routes_repo.update_waypoint(waypoint.route_id,
                                                        waypoint.location_number,
                                                        waypoint.visited,
                                                        waypoint.comment)
