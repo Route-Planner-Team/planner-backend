@@ -23,75 +23,153 @@ def auth_header(user_data, client):
     headers = {"Authorization": f"Bearer {auth_token}" }
     return headers
 
-# Unit testy na algorythm planowanie trasy
-def test_get_routes():
-    routes = {
-        "depot_address": "Naramowicka 219, 61-611 Poznań",
-        "addresses": ["Rubież 46, C3 11, 61-612 Poznań",
-                    "Rubież 14a/37, 61-612 Poznań",
-                    "Radłowa 16, 61-602 Poznań",
-                    "Zagajnikowa 9, 60-995 Poznań",
-                    "Krótka 24, 62-007 Biskupice",
-                    "Aleja Jana Pawła II 30, 93-570 Łódź",
-                    "Jagiellońska 59, 85-027 Bydgoszcz"],
-        "priorities": [2,1,3,2,1,2,3],
-        "days": 1,
-        "distance_limit":1000,
-        "duration_limit": 1000,
+# Checks if 'preferences' works
+def check_duration_diff():
+    # when preference is duration
+    params1 = {
+        "depot_address": "Święty Marcin 80/82, 61-809 Poznań",
+        "addresses": ["Kraszewskiego 9B, 60-501 Poznań",
+                    "Szpitalna 27/33, 60-572 Poznań",
+                    "Warmińska 2, 60-622 Poznań",
+                    "Aleje Solidarności 42, 61-696 Poznań",
+                    "Szarych Szeregów 16, 60-462 Poznań",
+                    "Dworksa 1, 61-619 Poznań",
+                    "Kępa 1, 60-021 Poznań",
+                    "Gdańska 2, 61-123 Poznań",
+                    "Szwajcarska 14, 61-285 Poznań",
+                    "świętego Antoniego 61, 61-359 Poznań",
+                    "62-030, Powstańców Wielkopolskich, 61-030 Luboń"],
+        "priorities": [2,1,3,2,1,2,3,2,1,3,2],
+        "days": 3,
+        "distance_limit":1000000,
+        "duration_limit": 1000000,
         "preferences": "duration",
         "avoid_tolls": False
     }
+    # when preference is distance
+    params2 = {
+        "depot_address": "Święty Marcin 80/82, 61-809 Poznań",
+        "addresses": ["Kraszewskiego 9B, 60-501 Poznań",
+                    "Szpitalna 27/33, 60-572 Poznań",
+                    "Warmińska 2, 60-622 Poznań",
+                    "Aleje Solidarności 42, 61-696 Poznań",
+                    "Szarych Szeregów 16, 60-462 Poznań",
+                    "Dworksa 1, 61-619 Poznań",
+                    "Kępa 1, 60-021 Poznań",
+                    "Gdańska 2, 61-123 Poznań",
+                    "Szwajcarska 14, 61-285 Poznań",
+                    "świętego Antoniego 61, 61-359 Poznań",
+                    "62-030, Powstańców Wielkopolskich, 61-030 Luboń"],
+        "priorities": [2,1,3,2,1,2,3,2,1,3,2],
+        "days": 3,
+        "distance_limit":1000000,
+        "duration_limit": 1000000,
+        "preferences": "distance",
+        "avoid_tolls": False
+    }
+    routes1 = routes_planner.get_routes(params1['depot_address'],
+                                        params1['addresses'],
+                                        params1['priorities'],
+                                        params1['days'],
+                                        params1['distance_limit'],
+                                        params1['duration_limit'],
+                                        params1['preferences'],
+                                        params1['avoid_tolls'])
 
-    # test data to generate route for 3 days and with other address
-    # routes = {
-    #     "depot_address": "Opieńskiego 1, 60-685 Poznań",
-    #     "addresses": ["Młyńska 7, 64-600 Oborniki",
-    #                 "Al. Wojska Polskiego 1, 85-171 Bydgoszcz",
-    #                 "Broniewskiego 90, 87-100 Toruń",
-    #                 "Kilińskiego 3, 87-800 Włocławek",
-    #                 "Budowlanych 1, 63-400 Ostrów Wielkopolski",
-    #                 "Aleja Jana Pawła II 30, 93-570 Łódź",
-    #                 "Jagiellońska 59, 85-027 Bydgoszcz",
-    #                 "Głogowska 432, 60-004 Poznań"],
-    #     "priorities": [2,1,3,2,1,2,3,2],
-    #     "days": 3,
-    #     "distance_limit":1000,
-    #     "duration_limit": 1000,
-    #     "preferences": "duration",
-    #     "avoid_tolls": False
-    # }
+    routes2 = routes_planner.get_routes(params2['depot_address'],
+                                        params2['addresses'],
+                                        params2['priorities'],
+                                        params2['days'],
+                                        params2['distance_limit'],
+                                        params2['duration_limit'],
+                                        params2['preferences'],
+                                        params2['avoid_tolls'])
 
-    route = routes_planner.get_routes(routes['depot_address'],
-                                           routes['addresses'],
-                                           routes['priorities'],
-                                           routes['days'],
-                                           routes['distance_limit'],
-                                           routes['duration_limit'],
-                                           routes['preferences'],
-                                           routes['avoid_tolls'])
+    total_duration_routes1 = sum(route['duration_hours'] for route in routes1.value())
+    total_duration_routes2 = sum(route['duration_hours'] for route in routes2.value())
 
-    assert route
+    assert total_duration_routes1 < total_duration_routes2
 
-    with pytest.raises(ValueError):
-        # test with bad distance limit, 100 km, unreal to drive from all this points
-        route = routes_planner.get_routes(routes['depot_address'],
-                                           routes['addresses'],
-                                           routes['priorities'],
-                                           routes['days'],
-                                           100,
-                                           routes['duration_limit'],
-                                           routes['preferences'],
-                                           routes['avoid_tolls'])
-        # should raise ValueError: Can not compute routes for this parameters. Modify parameters.
 
-    with pytest.raises(ValueError):
-        # test with bad duration limit, 250 km, its not enough
-        route = routes_planner.get_routes(routes['depot_address'],
-                                           routes['addresses'],
-                                           routes['priorities'],
-                                           routes['days'],
-                                           routes['distance_limit'],
-                                           250,
-                                           routes['preferences'],
-                                           routes['avoid_tolls'])
-        # should raise ValueError: Can not compute routes for this parameters. Modify parameters.
+# Check if routes are saved into mongo
+def test_save_routes(client, auth_header):
+    routes = {
+        "depot_address":"Święty Marcin 80/82, 61-809 Poznań",
+        "addresses":["Kraszewskiego 9B, 60-501 Poznań",
+                    "Kwiatowa 43c, 66-400 Gorzów Wielkopolski",
+                    "62-030, Powstańców Wielkopolskich 79, 61-030 Luboń"],
+        "priorities": [1,1,2],
+        "days": 3,
+        "distance_limit": 100000,
+        "duration_limit": 100000,
+        "preferences": "distance",
+        "avoid_tolls": True
+    }
+
+    response = client.post("/routes", json=routes, headers=auth_header)
+
+    routes = response.json()
+
+    assert response.status_code == 200
+    assert isinstance(routes, dict)
+    assert len(routes) == 3
+
+
+# Checks if endpoint returns all routes for user
+def test_get_user_routes(client, auth_header):
+    response = client.get("/routes", headers=auth_header)
+
+    routes = response.json()
+
+    assert isinstance(routes, dict)
+    assert len(routes) >= 3
+
+
+# Checks endpoint that updates waypoints
+def test_update_waypoints(client, auth_header):
+    routes = {
+        "depot_address": "Święty Marcin 80/82, 61-809 Poznań",
+        "addresses": ["Kraszewskiego 9B, 60-501 Poznań",
+                      "Kwiatowa 43c, 66-400 Gorzów Wielkopolski",
+                      "62-030, Powstańców Wielkopolskich 79, 61-030 Luboń"],
+        "priorities": [1, 1, 2],
+        "days": 3,
+        "distance_limit": 100000,
+        "duration_limit": 100000,
+        "preferences": "distance",
+        "avoid_tolls": True
+    }
+
+    response = client.post("/routes", json=routes, headers=auth_header)
+    response_data = response.json()
+    route_id = response_data['0']['route_id']
+
+    # update every waypoint in first route
+    for i in range(3):
+        waypoint = {
+            "route_id": route_id,
+            "location_number": i,
+            "visited": True,
+            "comment": "Visited waypoint"
+        }
+        response = client.post("routes/waypoint", json=waypoint, headers=auth_header)
+
+    assert response.json()['whole_route_completed'] is True
+
+
+# Check if endpoint routes/active returns only active routes
+def test_get_user_active_routes(client, auth_header):
+    all_response = client.get("/routes", headers=auth_header)
+    active_response = client.get("/routes/active", headers=auth_header)
+
+    all_routes = all_response.json()
+    active_routes = active_response.json()
+
+    assert len(all_routes) > len(active_routes)
+
+
+# Check if endpoints deletes all routes for user
+def test_del_user_routes(client, auth_header):
+    response = client.delete("/routes", headers=auth_header)
+
+    assert response.json()['deleted'] >= 3
