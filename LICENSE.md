@@ -18,7 +18,7 @@ Projekt "Route Planner" jest chroniony prawem własności intelektualnej. Udost�
 
 Prosimy o wpisanie swojego imienia, nazwiska oraz daty, aby podpisać ten dokument:
 
-1. Imię Nazwisko - [data]
+1. Michał Szuszert - 19.06.2023
 2. Imię Nazwisko - [data]
 3. Imię Nazwisko - [data]
 4. Imię Nazwisko - [data]
