@@ -99,7 +99,7 @@ def test_save_routes(client, auth_header):
                     "Kwiatowa 43c, 66-400 Gorzów Wielkopolski",
                     "62-030, Powstańców Wielkopolskich 79, 61-030 Luboń"],
         "priorities": [1,1,2],
-        "days": 3,
+        "days": 1,
         "distance_limit": 100000,
         "duration_limit": 100000,
         "preferences": "distance",
@@ -112,7 +112,7 @@ def test_save_routes(client, auth_header):
 
     assert response.status_code == 200
     assert isinstance(routes, dict)
-    assert len(routes) == 3
+    assert len(routes) == 6
 
 
 # Checks if endpoint returns all routes for user
@@ -122,7 +122,7 @@ def test_get_user_routes(client, auth_header):
     routes = response.json()
 
     assert isinstance(routes, dict)
-    assert len(routes) >= 3
+    assert len(routes) >= 1
 
 
 # Checks endpoint that updates waypoints
@@ -133,7 +133,7 @@ def test_update_waypoints(client, auth_header):
                       "Kwiatowa 43c, 66-400 Gorzów Wielkopolski",
                       "62-030, Powstańców Wielkopolskich 79, 61-030 Luboń"],
         "priorities": [1, 1, 2],
-        "days": 3,
+        "days": 1,
         "distance_limit": 100000,
         "duration_limit": 100000,
         "preferences": "distance",
@@ -142,19 +142,21 @@ def test_update_waypoints(client, auth_header):
 
     response = client.post("/routes", json=routes, headers=auth_header)
     response_data = response.json()
-    route_id = response_data['0']['route_id']
+    routes_id = response_data['routes_id']
 
     # update every waypoint in first route
-    for i in range(3):
+    for i in range(5):
         waypoint = {
-            "route_id": route_id,
+            "routes_id": routes_id,
+            "route_number": 0,
             "location_number": i,
             "visited": True,
             "comment": "Visited waypoint"
         }
         response = client.post("routes/waypoint", json=waypoint, headers=auth_header)
 
-    assert response.json()['whole_route_completed'] is True
+    assert response.json()['0']['completed'] is True
+    assert response.json()['routes_completed'] is True
 
 
 # Check if endpoint routes/active returns only active routes
@@ -172,4 +174,4 @@ def test_get_user_active_routes(client, auth_header):
 def test_del_user_routes(client, auth_header):
     response = client.delete("/routes", headers=auth_header)
 
-    assert response.json()['deleted'] >= 3
+    assert response.json()['deleted'] >= 1

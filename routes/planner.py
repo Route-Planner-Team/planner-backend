@@ -487,7 +487,8 @@ class RoutesPlanner():
                 'distance_km': value[1],
                 'duration_hours': value[2] / 60,
                 'fuel_liters': value[3],
-                'polyline': value[4]
+                'polyline': value[4],
+                'route_number': key
             }
         for key in routes_dict:
             routes_dict[key]['coords'] = [{'latitude': coord[0], 'longitude': coord[1], 'name': self.add_address_name(coord[0], coord[1]), 'location_number': i, 'visited': None, 'comment': None} for i, coord in enumerate(routes_dict[key]['coords'])]

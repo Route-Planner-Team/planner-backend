@@ -8,6 +8,8 @@ from pymongo.collection import Collection
 from pymongo.database import Database
 from pymongo.results import InsertOneResult
 
+import datetime
+
 
 class RouteRepository():
     def __init__(self, config):
@@ -35,17 +37,19 @@ class RouteRepository():
 
         document = self.convert_dict_keys_to_str(body)
 
-        all_docs = {}
+        document['user_firebase_id'] = uid
+        document['email'] = firebase_user.email
 
-        for key, value in document.items():
-            value['user_firebase_id'] = uid
-            value['email'] = firebase_user.email
-            res = self.routes_collection.insert_one(dict(value))
-            value['route_id'] = str(res.inserted_id)
-            all_docs[key] = value
+        document['routes_completed'] = False
 
-        return all_docs
+        current_datetime = datetime.datetime.now()
+        document['generation_date'] = f'{current_datetime.day:02d}.{current_datetime.month:02d}.{current_datetime.year}, {current_datetime.hour:02d}:{current_datetime.minute:02d}'
 
+        res = self.routes_collection.insert_one(dict(document))
+
+        document['routes_id'] = str(res.inserted_id)
+
+        return document
     def get_user_route(self, uid: str, active=False):
         cursor = self.routes_collection.find({"user_firebase_id": uid})
         documents = list(cursor)
@@ -53,44 +57,84 @@ class RouteRepository():
         all_routes = []
 
         for document in documents:
-            document['route_id'] = str(document.pop('_id'))
+            document['routes_id'] = str(document.pop('_id'))
             all_routes.append(document)
 
         # Returns routes where completed is False
         if active is True:
-            active_routes = {str(i): value for i, value in enumerate(all_routes) if value.get('completed') is False}
-            active_routes = {str(i): value for i, (key, value) in enumerate(active_routes.items())}
-            return active_routes
+            # Filter documents
+            active_routes = []
+            for document in all_routes:
+                if document.get('routes_completed') is False:
+                    active_routes.append(document)
+            # Filter routes
+            filtered_data = []
+            for routes in active_routes:
+                filtered_routes = {}
 
-        all_routes_as_dict = {str(i): value for i, value in enumerate(all_routes)}
+                for key, value in routes.items():
+                    if key not in ('user_firebase_id', 'email', 'routes_completed', 'generation_date', 'routes_id') and (not value.get('completed', False)):
+                        filtered_routes[key] = value
+
+                filtered_routes['user_firebase_id'] = routes['user_firebase_id']
+                filtered_routes['email'] = routes['email']
+                filtered_routes['routes_completed'] = routes['routes_completed']
+                filtered_routes['generation_date'] = routes['generation_date']
+                filtered_routes['routes_id'] = routes['routes_id']
+
+                filtered_data.append(filtered_routes)
+
+            filtered_data_to_dict = {str(i): value for i, value in enumerate(filtered_data)}
+
+            return filtered_data_to_dict
 
         # Returns all routes no matter if completed is False or True
+        all_routes_as_dict = {str(i): value for i, value in enumerate(all_routes)}
+
         return all_routes_as_dict
 
     def delete_user_route(self, uid) -> int:
         resp = self.routes_collection.delete_many({"user_firebase_id": uid})
         return resp.deleted_count
 
-    def update_waypoint(self, route_id: str, location_number: int, visited: bool, comment: str):
+    def update_waypoint(self, routes_id: str, route_number: str, location_number: int, visited: bool, comment: str):
         # Get right routes document
-        route = self.routes_collection.find_one({"_id": ObjectId(route_id)})
+        routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
+        route = []
+        for key, value in routes.items():
+            if isinstance(value, dict):
+                if 'route_number' in value and value['route_number'] == route_number:
+                    route.append((key, value))
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict) and 'route_number' in item and item['route_number'] == route_number:
+                        route.append((key, item))
 
-        # Pass visited and comment into route
-        if 'coords' in route and isinstance(route['coords'], list):
-            for item in route['coords']:
-                if 'location_number' in item and item['location_number'] == location_number:
-                    item['visited'] = visited
-                    item['comment'] = comment
+        # Pass visited and comment into right route
+        for key, value in dict(route).items():
+            if isinstance(value, dict):
+                if 'coords' in value and isinstance(value['coords'], list):
+                    for item in value['coords']:
+                        if 'location_number' in item and item['location_number'] == location_number:
+                            item['visited'] = visited
+                            item['comment'] = comment
 
         # Check if in all location there is True or False value
-        all_visited = all(item['visited'] in [True, False] for item in route['coords'])
-        route['completed'] = all_visited
+        all_visited = all(item['visited'] in [True, False] for item in route[0][1]['coords'])
+        route[0][1]['completed'] = all_visited
 
         # Update document in mongo
-        self.routes_collection.replace_one({"_id": ObjectId(route_id)}, route)
+        self.routes_collection.replace_one({"_id": ObjectId(routes_id)}, routes)
 
-        return {'route_id': route_id,
+        # Update 'routes_completed' if all routes are completed
+        all_routes_completed = all(route.get('completed', True) for _, route in routes.items() if isinstance(route, dict))
+        if all_routes_completed:
+            self.routes_collection.update_one({'_id': ObjectId(routes_id)}, {'$set': {'routes_completed': True}})
+
+        return {'routes_id': routes_id,
+                'route_number': route_number,
                 'location_number': location_number,
                 'visited': visited,
                 'comment': comment,
-                'whole_route_completed': all_visited}
+                'completed': all_visited,
+                'routes_completed': all_routes_completed}
