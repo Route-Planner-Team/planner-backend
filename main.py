@@ -245,7 +245,8 @@ def mark_visited_waypoint(request: Request, waypoint: WaypointModel):
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
     try:
-        updated_waypoint = routes_repo.update_waypoint(waypoint.route_id,
+        updated_waypoint = routes_repo.update_waypoint(waypoint.routes_id,
+                                                       waypoint.route_number,
                                                        waypoint.location_number,
                                                        waypoint.visited,
                                                        waypoint.comment)
