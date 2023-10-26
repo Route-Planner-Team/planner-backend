@@ -18,3 +18,7 @@ class WaypointModel(BaseModel):
 
 class RegenerateModel(BaseModel):
     routes_id: str = Field(..., description="Collection of routes for which we want to regenerate + unvisited locations from that collection")
+
+class StatisticModel(BaseModel):
+    start_date: str = Field(..., description="From when we want to get stats, format DD.MM.YYYY")
+    end_date: str = Field(..., description="To when we want to get stats, format DD.MM.YYYY")

@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from loguru import logger
 
 from config import Config
-from routes.model import RoutesModel, WaypointModel, RegenerateModel
+from routes.model import RoutesModel, WaypointModel, RegenerateModel, StatisticModel
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
 from users.auth import authenticate_header
@@ -212,7 +212,7 @@ def routes_post_handler(request: Request, routes: RoutesModel, routes_id: str = 
                                                       routes.duration_limit,
                                                       routes.preferences,
                                                       routes.avoid_tolls)
-        #TODO, if regenerate needs to replace exisiting document
+
         routes = routes_repo.create_user_route(uid, calculated_routes, routes.days, routes.distance_limit, routes.duration_limit, routes.preferences, routes.avoid_tolls, routes_id)
 
     except ValueError as e:
@@ -270,6 +270,20 @@ def regenerate_routes(request: Request, regenerate: RegenerateModel):
     try:
         locations = routes_repo.get_locations_to_regenerate(regenerate.routes_id)
         return locations
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content={"error": e.detail})
+
+@app.get("/stats")
+@logger.catch
+def get_statistics(request: Request, statistics: StatisticModel):
+    uid = request.state.uid
+    if uid is None:
+        raise NotAuthenticated('User ID not found in token')
+    try:
+        stats = routes_repo.collect_stats(uid,
+                                          statistics.start_date,
+                                          statistics.end_date)
+        return stats
     except HTTPException as e:
         return JSONResponse(status_code=e.status_code, content={"error": e.detail})
 

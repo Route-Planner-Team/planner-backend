@@ -12,6 +12,8 @@ protected_endpoints = [
     "/routes",
     "/routes/active",
     "/routes/waypoint"
+    "/routes/regenerate",
+    "/stats"
     ]  # add endpoints you want to authorize
 
 def authenticate_header(request: Request, call_next):

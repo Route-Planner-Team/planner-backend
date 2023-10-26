@@ -10,6 +10,14 @@ from pymongo.results import InsertOneResult
 from fastapi import HTTPException
 
 import datetime
+from dateutil.parser import parse
+
+from config import Config
+
+cfg = Config()
+
+from routes.planner import RoutesPlanner
+routes_planner = RoutesPlanner(cfg)
 
 
 class RouteRepository():
@@ -153,6 +161,7 @@ class RouteRepository():
         routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
         if routes is None:
             raise HTTPException(status_code=404, detail="Routes not found")
+        avoid_tolls = routes['avoid_tolls']
         route = []
         for key, value in routes.items():
             if isinstance(value, dict):
@@ -207,8 +216,11 @@ class RouteRepository():
         current_datetime = datetime.datetime.now()
         if route[0][1]['completed'] is True:
             route[0][1]['date_of_completion'] = f'{current_datetime.day:02d}.{current_datetime.month:02d}.{current_datetime.year}, {current_datetime.hour:02d}:{current_datetime.minute:02d}'
-
-            # TODO, calculate real consumption for stats
+            real_distance, real_duration, real_polyline, real_fuel = self.get_real_stats(route[0][1]['coords'], avoid_tolls)
+            route[0][1]['distance_km'] = real_distance
+            route[0][1]['duration_hours'] = real_duration / 60
+            route[0][1]['polyline'] = real_polyline
+            route[0][1]['fuel_liters'] = real_fuel
 
         # Update document in mongo
         self.routes_collection.replace_one({"_id": ObjectId(routes_id)}, routes)
@@ -350,3 +362,96 @@ class RouteRepository():
                         'avoid_tolls': avoid_tolls_locations,
                         'routes_id': routes_id}
             return document
+
+    def get_real_stats(self, route, avoid_tolls):
+        locations = []
+        for location in route:
+            if location['isDepot'] is True:
+                locations.append([location['latitude'], location['longitude']])
+            if location['visited'] is True and location['isDepot'] is False:
+                locations.append([location['latitude'], location['longitude']])
+
+        if len(locations) == 2:
+            return 0.0, 0.0, "", 0.0
+
+        real_distance, real_duration, real_polyline = routes_planner.get_distance_duration(avoid_tolls, locations)
+
+        real_total_fuel = 0
+        for i in range(len(locations) - 1):
+            origin = locations[i]
+            destination = locations[i + 1]
+            fuel_consumption = routes_planner.get_fuel_between_points(avoid_tolls, origin, destination)
+            real_total_fuel = real_total_fuel + fuel_consumption
+
+        return real_distance, real_duration, real_polyline, real_total_fuel
+
+    def collect_stats(self, uid, start_date, end_date):
+        routes = self.get_user_route(uid, False)
+        num_completed_routes = 0
+        sum_distance = 0
+        sum_duration = 0
+        sum_fuel = 0
+        sum_days_of_week = {'Monday':0, 'Tuesday':0, 'Wednesday': 0, 'Thursday':0, 'Friday':0, 'Saturday':0, 'Sunday': 0}
+        num_visited_loc = 0
+        num_unvisited_loc = 0
+        most_frequently_visited = []
+        most_frequently_missed = []
+        sum_of_priorities = {'Priority 1':0, 'Priority 2':0, 'Priority 3':0}
+        most_frequent_depot = []
+        for key, value in routes.items():
+            if isinstance(value, dict):
+                for key_in, value_in in value.items():
+                    if isinstance(value_in, dict):
+                        if value_in['date_of_completion'] is not None and parse(start_date) <= parse(value_in['date_of_completion']) <= parse(end_date):
+                            num_completed_routes = num_completed_routes + 1
+                            sum_distance = sum_distance + value_in['distance_km']
+                            sum_duration = sum_duration + value_in['duration_hours']
+                            sum_fuel = sum_fuel + value_in['fuel_liters']
+                            data_obj = parse(value_in['date_of_completion'])
+                            day_of_week = data_obj.strftime("%A")
+                            sum_days_of_week[day_of_week] = sum_days_of_week[day_of_week] + 1
+                            for location in value_in['coords']:
+                                if location['visited'] is True and location['isDepot'] is False:
+                                    num_visited_loc = num_visited_loc + 1
+                                    most_frequently_visited.append(location['name'])
+                                    if location['priority'] == 1:
+                                        sum_of_priorities['Priority 1'] = sum_of_priorities['Priority 1'] + 1
+                                    if location['priority'] == 2:
+                                        sum_of_priorities['Priority 2'] = sum_of_priorities['Priority 2'] + 1
+                                    if location['priority'] == 3:
+                                        sum_of_priorities['Priority 3'] = sum_of_priorities['Priority 3'] + 1
+                                if location['visited'] is False and location['isDepot'] is False:
+                                    num_unvisited_loc = num_unvisited_loc + 1
+                                    most_frequently_missed.append(location['name'])
+                                if location['isDepot'] is True:
+                                    most_frequent_depot.append(location['name'])
+
+        return {'number_of_completed_routes': num_completed_routes,
+                'summed_distance_km': sum_distance,
+                'summed_duration_hours' : sum_duration,
+                'summed_fuel_liters': sum_fuel,
+                'summed_days_of_week_to_complete': sum_days_of_week,
+                'number_of_visited_locations': num_visited_loc,
+                'number_of_unvisited_locations': num_unvisited_loc,
+                'most_frequently_visited_locations': self.get_most_popular(most_frequently_visited),
+                'most_frequently_missed_locations': self.get_most_popular(most_frequently_missed),
+                'summed_visited_priorities': sum_of_priorities,
+                'most_frequent_depot': self.get_most_popular(most_frequent_depot)}
+
+    def get_most_popular(self, locations):
+        locations_with_count = {}
+        for location in locations:
+            if location in locations_with_count:
+                locations_with_count[location] += 1
+            else:
+                locations_with_count[location] = 1
+
+        for location, count in locations_with_count.items():
+            locations_with_count[location] = count // 2
+
+        sorted_counts = sorted(locations_with_count.items(), key=lambda x: x[1])
+        least_popular = sorted_counts[:3]
+        most_popular = sorted_counts[-3:][::-1]
+
+        return dict(most_popular)
+
