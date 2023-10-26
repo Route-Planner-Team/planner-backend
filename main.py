@@ -8,10 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi_exceptions.exceptions import NotAuthenticated
 from firebase_admin import credentials
+from fastapi import HTTPException
 from loguru import logger
 
 from config import Config
-from routes.model import RoutesModel, WaypointModel
+from routes.model import RoutesModel, WaypointModel, RegenerateModel
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
 from users.auth import authenticate_header
@@ -198,19 +199,21 @@ def active_routes_handler(request: Request):
 
 @app.post("/routes")
 @logger.catch
-def routes_post_handler(request: Request, routes: RoutesModel):
+def routes_post_handler(request: Request, routes: RoutesModel, routes_id: str = None):
     uid = request.state.uid
+    if uid is None:
+        raise NotAuthenticated('User ID not found in token')
     try:
-        routes = routes_planner.get_routes(routes.depot_address,
-                                           routes.addresses,
-                                           routes.priorities,
-                                           routes.days,
-                                           routes.distance_limit,
-                                           routes.duration_limit,
-                                           routes.preferences,
-                                           routes.avoid_tolls)
-
-        routes = routes_repo.create_user_route(uid, routes)
+        calculated_routes = routes_planner.get_routes(routes.depot_address,
+                                                      routes.addresses,
+                                                      routes.priorities,
+                                                      routes.days,
+                                                      routes.distance_limit,
+                                                      routes.duration_limit,
+                                                      routes.preferences,
+                                                      routes.avoid_tolls)
+        #TODO, if regenerate needs to replace exisiting document
+        routes = routes_repo.create_user_route(uid, calculated_routes, routes.days, routes.distance_limit, routes.duration_limit, routes.preferences, routes.avoid_tolls, routes_id)
 
     except ValueError as e:
         error = str(e)
@@ -240,7 +243,7 @@ def del_user_route(request: Request):
 
 @app.post("/routes/waypoint")
 @logger.catch
-def mark_visited_waypoint(request: Request, waypoint: WaypointModel):
+def mark_visited_waypoint(request: Request, waypoint: WaypointModel, should_keep: bool = False):
     uid = request.state.uid
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
@@ -249,11 +252,25 @@ def mark_visited_waypoint(request: Request, waypoint: WaypointModel):
                                                        waypoint.route_number,
                                                        waypoint.location_number,
                                                        waypoint.visited,
-                                                       waypoint.comment)
+                                                       should_keep)
 
         return updated_waypoint
 
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content={"error": e.detail})
     except ValueError as e:
-        error = str(e)
-        print(error, file=sys.stderr)
-        return JSONResponse(status_code=400, content={"error": error})
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+@app.get("/routes/regenerate")
+@logger.catch
+def regenerate_routes(request: Request, regenerate: RegenerateModel):
+    uid = request.state.uid
+    if uid is None:
+        raise NotAuthenticated('User ID not found in token')
+    try:
+        locations = routes_repo.get_locations_to_regenerate(regenerate.routes_id)
+        return locations
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content={"error": e.detail})
+
+

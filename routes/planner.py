@@ -478,20 +478,29 @@ class RoutesPlanner():
         return address_name
 
     # Function changes names of output values
-    def add_parameter_names_to_output(self, routes):
+    def add_parameter_names_to_output(self, routes, addresses_priorities_dict):
         routes_dict = {}
         for key, value in routes.items():
             routes_dict[key] = {
                 'coords': value[0],
                 'completed': False,
+                'date_of_completion': None,
                 'distance_km': value[1],
                 'duration_hours': value[2] / 60,
                 'fuel_liters': value[3],
                 'polyline': value[4],
                 'route_number': key
             }
+
         for key in routes_dict:
-            routes_dict[key]['coords'] = [{'latitude': coord[0], 'longitude': coord[1], 'name': self.add_address_name(coord[0], coord[1]), 'location_number': i, 'visited': None, 'comment': None} for i, coord in enumerate(routes_dict[key]['coords'])]
+            routes_dict[key]['coords'] = [{'latitude': coord[0],
+                                           'longitude': coord[1],
+                                           'name': self.add_address_name(coord[0], coord[1]),
+                                           'priority': addresses_priorities_dict.get((coord[0], coord[1])),
+                                           'location_number': i,
+                                           'visited': None,
+                                           'should_keep': None,
+                                           'isDepot': i == 0 or i == len(routes_dict[key]['coords']) - 1} for i, coord in enumerate(routes_dict[key]['coords'])]
         return routes_dict
 
     def get_routes(self, depot_address, addresses, priorities, days, distance_limit, duration_limit, preferences, avoid_tolls):
@@ -513,6 +522,9 @@ class RoutesPlanner():
 
         # Convert addresses of addresses to coords
         addresses_coords = self.get_addresses_coords(addresses)
+
+        # Dict to save proper priority in db
+        addresses_priorities_dict = {key: value for key, value in zip([(address['lat'], address['lng']) for address in addresses_coords], priorities)}
 
         # For further convenience we put data into pandas DataFrame
         df_addresses = pd.DataFrame(addresses_coords)
@@ -560,6 +572,6 @@ class RoutesPlanner():
                 routes = self.choose_min_routes(all_routes, 'fuel')
 
         # Change names of output values
-        routes = self.add_parameter_names_to_output(routes)
+        routes = self.add_parameter_names_to_output(routes, addresses_priorities_dict)
 
         return routes
