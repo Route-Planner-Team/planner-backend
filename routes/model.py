@@ -15,4 +15,6 @@ class WaypointModel(BaseModel):
     route_number: int = Field(..., description="Id of a single route in a set")
     location_number: int = Field(..., description="Number for a  waypoint in a route")
     visited: bool = Field(..., description="True if visited, False by default")
-    comment: str = Field(..., description="Comment for a waypoint")
+
+class RegenerateModel(BaseModel):
+    routes_id: str = Field(..., description="Collection of routes for which we want to regenerate + unvisited locations from that collection")
