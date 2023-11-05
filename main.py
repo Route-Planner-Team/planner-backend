@@ -4,7 +4,7 @@ import firebase_admin
 from firebase_admin.auth import EmailAlreadyExistsError
 import googlemaps
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi_exceptions.exceptions import NotAuthenticated
 from firebase_admin import credentials
@@ -44,14 +44,6 @@ firebase = firebase_admin.initialize_app(cred)
 gmaps = googlemaps.Client(key=Config.GOOGLEMAPS_API_KEY)
 
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=['*'],
-    allow_credentials=True,
-    allow_methods=['*'],
-    allow_headers=['*'],
-)
 
 '''
 To get authorization token:
@@ -287,4 +279,11 @@ def get_statistics(request: Request, statistics: StatisticModel):
     except HTTPException as e:
         return JSONResponse(status_code=e.status_code, content={"error": e.detail})
 
-
+# Keep this below all endpoint definitions!
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
