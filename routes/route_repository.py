@@ -55,8 +55,10 @@ class RouteRepository():
         document['preferences'] = preferences
         document['avoid_tolls'] = avoid_tolls
         document['routes_completed'] = False
+        document['date_of_completion'] = None
         current_datetime = datetime.datetime.now()
         document['generation_date'] = f'{current_datetime.day:02d}.{current_datetime.month:02d}.{current_datetime.year}, {current_datetime.hour:02d}:{current_datetime.minute:02d}'
+        document['name'] = f'{current_datetime.day:02d}.{current_datetime.month:02d}.{current_datetime.year}, {current_datetime.hour:02d}:{current_datetime.minute:02d}' #date as default
 
         if routes_id is not None:
             routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
@@ -127,7 +129,7 @@ class RouteRepository():
                 filtered_routes = {}
 
                 for key, value in routes.items():
-                    if key not in ('user_firebase_id', 'email', 'days', 'distance_limit', 'duration_limit', 'preferences', 'avoid_tolls', 'routes_completed', 'generation_date', 'routes_id') and (not value.get('completed', False)):
+                    if key not in ('user_firebase_id', 'email', 'days', 'distance_limit', 'duration_limit', 'preferences', 'avoid_tolls', 'routes_completed', 'date_of_completion', 'generation_date', 'routes_id', 'name') and (not value.get('completed', False)):
                         filtered_routes[key] = value
 
                 filtered_routes['user_firebase_id'] = routes['user_firebase_id']
@@ -138,7 +140,9 @@ class RouteRepository():
                 filtered_routes['preferences'] = routes['preferences']
                 filtered_routes['avoid_tolls'] = routes['avoid_tolls']
                 filtered_routes['routes_completed'] = routes['routes_completed']
+                filtered_routes['date_of_completion'] = routes['date_of_completion']
                 filtered_routes['generation_date'] = routes['generation_date']
+                filtered_routes['name'] = routes['name']
                 filtered_routes['routes_id'] = routes['routes_id']
 
                 filtered_data.append(filtered_routes)
@@ -228,7 +232,7 @@ class RouteRepository():
         # Update 'routes_completed' if all routes are completed
         all_routes_completed = all(route.get('completed', True) for _, route in routes.items() if isinstance(route, dict))
         if all_routes_completed:
-            self.routes_collection.update_one({'_id': ObjectId(routes_id)}, {'$set': {'routes_completed': True}})
+            self.routes_collection.update_one({'_id': ObjectId(routes_id)}, {'$set': {'routes_completed': True, 'date_of_completion': f'{current_datetime.day:02d}.{current_datetime.month:02d}.{current_datetime.year}, {current_datetime.hour:02d}:{current_datetime.minute:02d}'}})
 
         if name == depot_address:
             return {'routes_id': routes_id,
@@ -454,4 +458,14 @@ class RouteRepository():
         most_popular = sorted_counts[-3:][::-1]
 
         return dict(most_popular)
+
+    def change_routes_name(self, routes_id, name):
+        routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
+        if routes is None:
+            raise HTTPException(status_code=404, detail="Routes not found")
+        self.routes_collection.update_one({'_id': ObjectId(routes_id)}, {'$set': {'name': name}})
+        return {
+            "routes_id": str(routes['_id']),
+            "name": name
+        }
 

@@ -568,7 +568,6 @@ class RoutesPlanner():
             for j in range(len(polylines[0])):
                 routes_dict[i]['coords'][j]['polyline_to_next_point'] = polylines[i][j]
 
-        print(routes_dict)
         return routes_dict
 
     def get_routes(self, depot_address, addresses, priorities, days, distance_limit, duration_limit, preferences, avoid_tolls):
