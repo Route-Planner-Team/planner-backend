@@ -219,8 +219,59 @@ class RoutesPlanner():
 
         # Take polyline
         poly = data['routes'][0]['polyline']['encodedPolyline']
+        polylines = self.get_polylines(avoid_tolls, waypoints)
 
-        return distance_km, duration_min, poly
+        return distance_km, duration_min, poly, polylines
+
+    # Function to get polylines between points
+    def get_polylines(self, avoid_tolls, waypoints):
+        url = 'https://routes.googleapis.com/directions/v2:computeRoutes'
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': Config.GOOGLEMAPS_API_KEY,
+            'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.travelAdvisory.fuelConsumptionMicroliters'
+        }
+
+        if avoid_tolls is True:
+            avoid = True
+        else:
+            avoid = False
+
+        polylines = []
+
+        for i in range(len(waypoints)-1):
+            payload = {
+                "origin": {
+                    "location": {
+                        "latLng": {
+                            "latitude": waypoints[i][0],
+                            "longitude": waypoints[i][1]
+                        }
+                    }
+                },
+                "destination": {
+                    "location": {
+                        "latLng": {
+                            "latitude": waypoints[i+1][0],
+                            "longitude": waypoints[i+1][1]
+                        }
+                    }
+                },
+                "travelMode": "DRIVE",
+                "routingPreference": "TRAFFIC_AWARE_OPTIMAL",
+                "routeModifiers": {
+                    "avoidTolls": avoid
+                },
+                "extraComputations": ["FUEL_CONSUMPTION"]
+            }
+
+            response = requests.post(url, headers=headers, data=json.dumps(payload))
+
+            data = response.json()
+
+            polylines.append(data['routes'][0]['polyline']['encodedPolyline'])
+
+        return polylines
 
     # Function to create request that will return fuel consumption between 2 points
     def get_fuel_between_points(self, avoid_tolls, origin, destination):
@@ -309,7 +360,7 @@ class RoutesPlanner():
             waypoints = [depot] + ordered_addresses + [depot]
 
             # Calculate distance and duration for whole route
-            total_distance, total_duration, polyline = self.get_distance_duration(avoid_tolls, waypoints)
+            total_distance, total_duration, polyline, polylines = self.get_distance_duration(avoid_tolls, waypoints)
 
             # Calculate fuel consumption
             total_fuel = 0
@@ -319,7 +370,7 @@ class RoutesPlanner():
                 fuel_consumption = self.get_fuel_between_points(avoid_tolls, origin, destination)
                 total_fuel = total_fuel + fuel_consumption
 
-            routes[label] = [waypoints, total_distance, total_duration, total_fuel, polyline]
+            routes[label] = [waypoints, total_distance, total_duration, total_fuel, polyline, polylines]
 
         return routes
 
@@ -499,6 +550,9 @@ class RoutesPlanner():
                 'polyline': value[4],
                 'route_number': key
             }
+        polylines = []
+        for key, value in routes.items():
+            polylines.append(value[5])
 
         for key in routes_dict:
             routes_dict[key]['coords'] = [{'latitude': coord[0],
@@ -508,7 +562,13 @@ class RoutesPlanner():
                                            'location_number': i,
                                            'visited': None,
                                            'should_keep': None,
+                                           'polyline_to_next_point': None,
                                            'isDepot': i == 0 or i == len(routes_dict[key]['coords']) - 1} for i, coord in enumerate(routes_dict[key]['coords'])]
+        for i in range(len(polylines)):
+            for j in range(len(polylines[0])):
+                routes_dict[i]['coords'][j]['polyline_to_next_point'] = polylines[i][j]
+
+        print(routes_dict)
         return routes_dict
 
     def get_routes(self, depot_address, addresses, priorities, days, distance_limit, duration_limit, preferences, avoid_tolls):
