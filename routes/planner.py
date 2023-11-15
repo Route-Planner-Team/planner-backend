@@ -434,8 +434,16 @@ class RoutesPlanner():
 
     # We have to check if any route break daily limitations, and if so, we have to remove it from the list
     def check_limitations(self, all_routes, distance_limit, duration_limit):
+        if distance_limit == -1:
+            distance_limit = float('inf')
+        if duration_limit == -1:
+            duration_limit = float('inf')
         all_routes = [dis for dis in all_routes if all(val[1] <= distance_limit for val in dis.values())]
+        if len(all_routes) == 0:
+            return 'to_small_distance'
         all_routes = [dur for dur in all_routes if all(val[2] <= duration_limit for val in dur.values())]
+        if len(all_routes) == 0:
+            return 'to_small_duration'
         return all_routes
 
     # Function will choose routes that minimize preference given by user
@@ -561,6 +569,10 @@ class RoutesPlanner():
         all_routes = self.check_limitations(all_routes, distance_limit, duration_limit)
 
         # Return routes that minimize given preferences
+        if all_routes == 'to_small_distance':
+            raise ValueError('To small distance limit')
+        if all_routes == 'to_small_duration':
+            raise ValueError('To small duration limit')
         if len(all_routes) == 0:
             raise ValueError('Can not compute routes for this parameters. Modify parameters.')
         else:
