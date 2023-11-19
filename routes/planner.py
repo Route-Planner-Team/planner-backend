@@ -565,7 +565,7 @@ class RoutesPlanner():
                                            'polyline_to_next_point': None,
                                            'isDepot': i == 0 or i == len(routes_dict[key]['coords']) - 1} for i, coord in enumerate(routes_dict[key]['coords'])]
         for i in range(len(polylines)):
-            for j in range(len(polylines[0])):
+            for j in range(len(polylines[i])):
                 routes_dict[i]['coords'][j]['polyline_to_next_point'] = polylines[i][j]
 
         return routes_dict
