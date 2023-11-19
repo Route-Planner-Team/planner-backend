@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from loguru import logger
 
 from config import Config
-from routes.model import RoutesModel, WaypointModel, RegenerateModel, StatisticModel
+from routes.model import RoutesModel, WaypointModel, RegenerateModel, StatisticModel, RenameModel
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
 from users.auth import authenticate_header
@@ -248,6 +248,21 @@ def mark_visited_waypoint(request: Request, waypoint: WaypointModel, should_keep
 
         return updated_waypoint
 
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content={"error": e.detail})
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+@app.post("/routes/rename")
+@logger.catch
+def change_name_of_routes(request: Request, rename: RenameModel):
+    uid = request.state.uid
+    if uid is None:
+        raise NotAuthenticated('User ID not found in token')
+    try:
+        status = routes_repo.change_routes_name(rename.routes_id,
+                                                rename.name)
+        return status
     except HTTPException as e:
         return JSONResponse(status_code=e.status_code, content={"error": e.detail})
     except ValueError as e:

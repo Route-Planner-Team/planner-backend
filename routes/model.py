@@ -22,3 +22,7 @@ class RegenerateModel(BaseModel):
 class StatisticModel(BaseModel):
     start_date: str = Field(..., description="From when we want to get stats, format DD.MM.YYYY")
     end_date: str = Field(..., description="To when we want to get stats, format DD.MM.YYYY")
+
+class RenameModel(BaseModel):
+    routes_id: str = Field(..., description="Collection of routes for which we want to change name")
+    name: str = Field(..., description="New name for routes")
