@@ -164,7 +164,7 @@ def routes_get_handler(request: Request):
 
     res = routes_repo.get_user_route(uid=uid)
 
-    if len(res) == 0:
+    if len(res['routes']) == 0:
         return {'message': 'No routes for that user'}
 
     return res
@@ -183,7 +183,7 @@ def active_routes_handler(request: Request):
 
     res = routes_repo.get_user_route(uid=uid, active=True)
 
-    if len(res) == 0:
+    if len(res['routes']) == 0:
         return {'message': 'No active routes for that user'}
 
     return res
