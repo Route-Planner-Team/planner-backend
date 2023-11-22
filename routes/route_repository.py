@@ -505,7 +505,7 @@ class RouteRepository():
 
         return real_distance, real_duration, real_polyline, real_total_fuel
 
-    def collect_stats(self, uid, start_date, end_date):
+    def collect_stats(self, uid, start_date, end_date, all_locations=False):
         routes = self.get_user_route(uid, False, True)
         num_completed_routes = 0
         sum_distance = 0
@@ -518,6 +518,26 @@ class RouteRepository():
         most_frequently_missed = []
         sum_of_priorities = {'Priority 1':0, 'Priority 2':0, 'Priority 3':0}
         most_frequent_depot = []
+        all_locations_to_visit = []
+        all_depots = []
+
+        # If to get addresses and count of them
+        if all_locations is True:
+            for key, value in routes.items():
+                if isinstance(value, dict):
+                    for key_in, value_in in value.items():
+                        if isinstance(value_in, dict):
+                            for location in value_in['coords']:
+                                print(location['name'])
+                                if location['visited'] in [True, False, None] and location['isDepot'] is False:
+                                    all_locations_to_visit.append(location['name'])
+                                if location['isDepot'] is True:
+                                    all_depots.append(location['name'])
+            all_addresses = all_locations_to_visit + self.remove_half_duplicates(all_depots)
+            all_addresses = self.get_most_popular(all_addresses, divide=False, all_addresses=True)
+            transformed_addresses = [{'address': address, 'count': count} for address, count in all_addresses]
+            return {'addresses': transformed_addresses}
+
         for key, value in routes.items():
             if isinstance(value, dict):
                 for key_in, value_in in value.items():
@@ -556,9 +576,9 @@ class RouteRepository():
                 'most_frequently_visited_locations': self.get_most_popular(most_frequently_visited),
                 'most_frequently_missed_locations': self.get_most_popular(most_frequently_missed),
                 'summed_visited_priorities': sum_of_priorities,
-                'most_frequent_depot': self.get_most_popular(most_frequent_depot, divide=True)}
+                'most_frequent_depot': self.get_most_popular(most_frequent_depot, divide=True, all_addresses=False)}
 
-    def get_most_popular(self, locations, divide=False):
+    def get_most_popular(self, locations, divide=False, all_addresses=False):
         locations_with_count = {}
         for location in locations:
             if location in locations_with_count:
@@ -573,7 +593,26 @@ class RouteRepository():
         least_popular = sorted_counts[:3]
         most_popular = sorted_counts[-3:][::-1]
 
+        if all_addresses is True:
+            return sorted_counts[::-1]
+
         result = [{"address": address, "count": count} for address, count in most_popular]
+
+        return result
+
+    def remove_half_duplicates(self, depot_addresses):
+        counts = {}
+        result = []
+        for item in depot_addresses:
+            if item in counts:
+                if counts[item] > 1:
+                    result.append(item)
+                    counts[item] -= 1
+                else:
+                    del counts[item]
+            else:
+                counts[item] = 1
+                result.append(item)
 
         return result
 

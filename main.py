@@ -19,6 +19,8 @@ from users.auth import authenticate_header
 from users.model import UserEmailModel, UserModel, UserModelChangePassword
 from users.user_repository import UserRepository
 
+from datetime import datetime
+
 cfg = Config()
 
 user_repo = UserRepository(cfg)
@@ -289,8 +291,25 @@ def get_statistics(request: Request, statistics: StatisticModel):
     try:
         stats = routes_repo.collect_stats(uid,
                                           statistics.start_date,
-                                          statistics.end_date)
+                                          statistics.end_date,
+                                          False)
         return stats
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content={"error": e.detail})
+
+@app.get("/addresses")
+@logger.catch
+def get_used_locations(request: Request):
+    uid = request.state.uid
+    if uid is None:
+        raise NotAuthenticated('User ID not found in token')
+    try:
+        addresses = routes_repo.collect_stats(uid,
+                                              "01.01.2023",
+                                              datetime.now().strftime("%d.%m.%y"),
+                                              True)
+        return addresses
+
     except HTTPException as e:
         return JSONResponse(status_code=e.status_code, content={"error": e.detail})
 
