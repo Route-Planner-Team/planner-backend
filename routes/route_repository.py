@@ -68,13 +68,119 @@ class RouteRepository():
                 document['days'] = new_days
                 self.routes_collection.replace_one({"_id": ObjectId(routes_id)}, document)
                 document['routes_id'] = str(routes_id)
-                return document
+                transformed_document = self.transform_format(document, False)
+                return transformed_document
 
         res = self.routes_collection.insert_one(dict(document))
 
         document['routes_id'] = str(res.inserted_id)
 
-        return document
+        transformed_document = self.transform_format(document, False)
+
+        return transformed_document
+
+    def transform_format(self, document, all_routes=False):
+
+        if all_routes is True:
+            routes = []
+            for key_document, value_document in document.items():
+                if isinstance(value_document, dict):
+                    subRoutes = []
+                    for key_routes, value_routes in value_document.items():
+                        if isinstance(value_routes, dict):
+                            coords = []
+                            for location in value_routes["coords"]:
+                                point = {
+                                    "latitude": location["latitude"],
+                                    "longitude": location["longitude"],
+                                    "name": location["name"],
+                                    "priority": location["priority"],
+                                    "location_number": location["location_number"],
+                                    "visited": location["visited"],
+                                    "should_keep": location["should_keep"],
+                                    "polyline_to_next_point": location["polyline_to_next_point"],
+                                    "isDepot": location["isDepot"]
+                                }
+                                coords.append(point)
+                            route = {
+                                "coords": coords,
+                                "completed": value_routes["completed"],
+                                "date_of_completion": value_routes["date_of_completion"],
+                                "distance_km": value_routes["distance_km"],
+                                "duration_hours": value_routes["duration_hours"],
+                                "fuel_liters": value_routes["fuel_liters"],
+                                "polyline": value_routes["polyline"],
+                                "route_number": value_routes["route_number"]
+                            }
+                            subRoutes.append(route)
+                    output_data = {"subRoutes": subRoutes,
+                         "user_firebase_id": value_document["user_firebase_id"],
+                         "email": value_document["email"],
+                         "days": value_document["days"],
+                         "distance_limit": value_document["distance_limit"],
+                         "duration_limit": value_document["duration_limit"],
+                         "preferences": value_document["preferences"],
+                         "avoid_tolls": value_document["avoid_tolls"],
+                         "routes_completed": value_document["routes_completed"],
+                         "date_of_completion": value_document["date_of_completion"],
+                         "generation_date": value_document["generation_date"],
+                         "name": value_document["name"],
+                         "routes_id": value_document["routes_id"]
+                         }
+                    routes.append(output_data)
+
+            return {"routes": routes}
+
+        subRoutes = []
+
+        for key_document, value_document in document.items():
+            if isinstance(value_document, dict):
+                coords = []
+                for location in value_document["coords"]:
+                    point = {
+                        "latitude": location["latitude"],
+                        "longitude": location["longitude"],
+                        "name": location["name"],
+                        "priority": location["priority"],
+                        "location_number": location["location_number"],
+                        "visited": location["visited"],
+                        "should_keep": location["should_keep"],
+                        "polyline_to_next_point": location["polyline_to_next_point"],
+                        "isDepot": location["isDepot"]
+                    }
+                    coords.append(point)
+                route = {
+                    "coords": coords,
+                    "completed": value_document["completed"],
+                    "date_of_completion": value_document["date_of_completion"],
+                    "distance_km": value_document["distance_km"],
+                    "duration_hours": value_document["duration_hours"],
+                    "fuel_liters": value_document["fuel_liters"],
+                    "polyline": value_document["polyline"],
+                    "route_number": value_document["route_number"]
+                }
+                subRoutes.append(route)
+
+        output_data = {"routes": [
+                {"subRoutes": subRoutes,
+                "user_firebase_id": document["user_firebase_id"],
+                "email": document["email"],
+                "days": document["days"],
+                "distance_limit": document["distance_limit"],
+                "duration_limit": document["duration_limit"],
+                "preferences": document["preferences"],
+                "avoid_tolls": document["avoid_tolls"],
+                "routes_completed": document["routes_completed"],
+                "date_of_completion": document["date_of_completion"],
+                "generation_date": document["generation_date"],
+                "name": document["name"],
+                "routes_id": document["routes_id"]
+                }
+            ]
+        }
+
+        return output_data
+
 
     def get_completed_routes(self, routes):
         keys_to_remove = []
@@ -106,7 +212,7 @@ class RouteRepository():
 
         return sorted_doc, new_key
 
-    def get_user_route(self, uid: str, active=False):
+    def get_user_route(self, uid: str, active=False, for_stats=False):
         cursor = self.routes_collection.find({"user_firebase_id": uid})
         documents = list(cursor)
 
@@ -149,12 +255,22 @@ class RouteRepository():
 
             filtered_data_to_dict = {str(i): value for i, value in enumerate(filtered_data)}
 
-            return filtered_data_to_dict
+            if for_stats is True:
+                return filtered_data_to_dict
+
+            transformed_document = self.transform_format(filtered_data_to_dict, True)
+
+            return transformed_document
 
         # Returns all routes no matter if completed is False or True
         all_routes_as_dict = {str(i): value for i, value in enumerate(all_routes)}
 
-        return all_routes_as_dict
+        if for_stats is True:
+            return all_routes_as_dict
+
+        transformed_document = self.transform_format(all_routes_as_dict, True)
+
+        return transformed_document
 
     def delete_user_route(self, uid) -> int:
         resp = self.routes_collection.delete_many({"user_firebase_id": uid})
@@ -378,7 +494,7 @@ class RouteRepository():
         if len(locations) == 2:
             return 0.0, 0.0, "", 0.0
 
-        real_distance, real_duration, real_polyline = routes_planner.get_distance_duration(avoid_tolls, locations)
+        real_distance, real_duration, real_polyline, poly = routes_planner.get_distance_duration(avoid_tolls, locations)
 
         real_total_fuel = 0
         for i in range(len(locations) - 1):
@@ -390,7 +506,7 @@ class RouteRepository():
         return real_distance, real_duration, real_polyline, real_total_fuel
 
     def collect_stats(self, uid, start_date, end_date):
-        routes = self.get_user_route(uid, False)
+        routes = self.get_user_route(uid, False, True)
         num_completed_routes = 0
         sum_distance = 0
         sum_duration = 0
@@ -440,9 +556,9 @@ class RouteRepository():
                 'most_frequently_visited_locations': self.get_most_popular(most_frequently_visited),
                 'most_frequently_missed_locations': self.get_most_popular(most_frequently_missed),
                 'summed_visited_priorities': sum_of_priorities,
-                'most_frequent_depot': self.get_most_popular(most_frequent_depot)}
+                'most_frequent_depot': self.get_most_popular(most_frequent_depot, divide=True)}
 
-    def get_most_popular(self, locations):
+    def get_most_popular(self, locations, divide=False):
         locations_with_count = {}
         for location in locations:
             if location in locations_with_count:
@@ -451,13 +567,15 @@ class RouteRepository():
                 locations_with_count[location] = 1
 
         for location, count in locations_with_count.items():
-            locations_with_count[location] = count // 2
+            locations_with_count[location] = count // 2 if divide is True else count
 
         sorted_counts = sorted(locations_with_count.items(), key=lambda x: x[1])
         least_popular = sorted_counts[:3]
         most_popular = sorted_counts[-3:][::-1]
 
-        return dict(most_popular)
+        result = [{"address": address, "count": count} for address, count in most_popular]
+
+        return result
 
     def change_routes_name(self, routes_id, name):
         routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
