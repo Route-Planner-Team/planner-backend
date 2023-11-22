@@ -224,10 +224,10 @@ def del_user_route(request: Request, active: bool = False, routes_id: str = None
         resp = routes_repo.delete_user_route(uid,
                                              active,
                                              routes_id)
+        return resp
+        
     except HTTPException as e:
         return JSONResponse(status_code=e.status_code, content={"error": e.detail})
-
-    return resp
 
 @app.post("/routes/waypoint")
 @logger.catch
