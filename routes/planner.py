@@ -485,9 +485,9 @@ class RoutesPlanner():
 
     # We have to check if any route break daily limitations, and if so, we have to remove it from the list
     def check_limitations(self, all_routes, distance_limit, duration_limit):
-        if distance_limit == -1:
+        if distance_limit is None:
             distance_limit = float('inf')
-        if duration_limit == -1:
+        if duration_limit is None:
             duration_limit = float('inf')
         all_routes = [dis for dis in all_routes if all(val[1] <= distance_limit for val in dis.values())]
         if len(all_routes) == 0:

@@ -216,22 +216,18 @@ def routes_post_handler(request: Request, routes: RoutesModel, routes_id: str = 
 
 @app.delete("/routes")
 @logger.catch
-def del_user_route(request: Request):
-    """Delete all routes for current user
-    Raises:
-        NotAuthenticated
-
-    Returns:
-        Deleted int
-    """
-
+def del_user_route(request: Request, active: bool = False, routes_id: str = None):
     uid = request.state.uid
-    if uid is None :
+    if uid is None:
         raise NotAuthenticated('User ID not found in token')
+    try:
+        resp = routes_repo.delete_user_route(uid,
+                                             active,
+                                             routes_id)
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content={"error": e.detail})
 
-    count = routes_repo.delete_user_route(uid=uid)
-    return {"deleted": count}
-
+    return resp
 
 @app.post("/routes/waypoint")
 @logger.catch
@@ -240,7 +236,8 @@ def mark_visited_waypoint(request: Request, waypoint: WaypointModel, should_keep
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
     try:
-        updated_waypoint = routes_repo.update_waypoint(waypoint.routes_id,
+        updated_waypoint = routes_repo.update_waypoint(uid,
+                                                       waypoint.routes_id,
                                                        waypoint.route_number,
                                                        waypoint.location_number,
                                                        waypoint.visited,

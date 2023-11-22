@@ -272,11 +272,33 @@ class RouteRepository():
 
         return transformed_document
 
-    def delete_user_route(self, uid) -> int:
-        resp = self.routes_collection.delete_many({"user_firebase_id": uid})
-        return resp.deleted_count
+    def delete_user_route(self, uid, active, routes_id):
+        # Delete chosen routes_id
+        if routes_id is not None:
+            routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
+            if routes is None:
+                raise HTTPException(status_code=404, detail="Routes not found")
+            routes_resp = self.routes_collection.delete_many({"_id": ObjectId(routes_id)})
+            locations_resp = self.locations_collection.delete_many({"routes_id": routes_id})
 
-    def update_waypoint(self, routes_id: str, route_number: str, location_number: int, visited: bool, should_keep: bool):
+            return {'message': "Routes {} deleted".format(routes_id)}
+
+        # Delete active routes
+        if active is True:
+            routes_resp = self.routes_collection.delete_many({"user_firebase_id": uid, 'routes_completed': False})
+            locations_resp = self.locations_collection.delete_many({'user_firebase_id': uid})
+
+            return {'deleted_routes': routes_resp.deleted_count,
+                    'deleted_locations': locations_resp.deleted_count}
+
+        # Delete all routes
+        routes_resp = self.routes_collection.delete_many({"user_firebase_id": uid})
+        locations_resp = self.locations_collection.delete_many({'user_firebase_id': uid})
+
+        return {'deleted_routes': routes_resp.deleted_count,
+                'deleted_locations': locations_resp.deleted_count}
+
+    def update_waypoint(self, uid, routes_id: str, route_number: str, location_number: int, visited: bool, should_keep: bool):
         # Get right routes document
         routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
         if routes is None:
@@ -323,7 +345,7 @@ class RouteRepository():
                             name = item['name']
                             visited_changed = True
                             if visited is False and should_keep is True and item['isDepot'] is False:
-                                self.add_location_to_collection(routes_id, depot_address, item['name'], item['priority'], routes['days'], routes['distance_limit'], routes['duration_limit'], routes['preferences'], routes['avoid_tolls'])
+                                self.add_location_to_collection(routes_id, depot_address, item['name'], item['priority'], routes['days'], routes['distance_limit'], routes['duration_limit'], routes['preferences'], routes['avoid_tolls'], uid)
                                 item['should_keep'] = True
 
         # Check if location is in route
@@ -370,7 +392,7 @@ class RouteRepository():
                 'date_of_completion': route[0][1]['date_of_completion'],
                 'routes_completed': all_routes_completed}
 
-    def add_location_to_collection(self, routes_id, depot_address, address, priority, days, distance_limit, duration_limit, preferences, avoid_tolls):
+    def add_location_to_collection(self, routes_id, depot_address, address, priority, days, distance_limit, duration_limit, preferences, avoid_tolls, uid):
         # Check if there is a document with that routes
         routes = self.locations_collection.find_one({"routes_id": routes_id})
         if routes is None:
@@ -383,7 +405,8 @@ class RouteRepository():
                         'duration_limit': duration_limit,
                         'preferences': preferences,
                         'avoid_tolls': avoid_tolls,
-                        'routes_id': routes_id}
+                        'routes_id': routes_id,
+                        'user_firebase_id': uid}
 
             res = self.locations_collection.insert_one(document)
 
@@ -397,7 +420,8 @@ class RouteRepository():
                         'duration_limit': routes['duration_limit'],
                         'preferences': routes['preferences'],
                         'avoid_tolls': routes['avoid_tolls'],
-                        'routes_id': routes['routes_id']}
+                        'routes_id': routes['routes_id'],
+                        'user_firebase_id': uid}
 
             res = self.locations_collection.replace_one({"routes_id": routes_id}, document)
 
