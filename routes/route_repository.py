@@ -67,6 +67,7 @@ class RouteRepository():
                 document, new_days = self.merge_routes(document, completed_routes)
                 document['days'] = new_days
                 self.routes_collection.replace_one({"_id": ObjectId(routes_id)}, document)
+                self.locations_collection.delete_many({"routes_id": routes_id})
                 document['routes_id'] = str(routes_id)
                 transformed_document = self.transform_format(document, False)
                 return transformed_document
@@ -413,11 +414,12 @@ class RouteRepository():
             duration_limit_locations = locations['duration_limit']
             preferences_locations = locations['preferences']
             avoid_tolls_locations = locations['avoid_tolls']
-            self.locations_collection.delete_many({"routes_id": routes_id})
 
         #Get routes that were not visited
         routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
         if routes is not None:
+            if routes['routes_completed'] is True and locations is None:
+                return {'message': 'No locations to regenerate'}
             depot_address_routes = None
             addresses_routes = []
             priorities_routes = []
@@ -472,9 +474,10 @@ class RouteRepository():
                         'routes_id': routes_id}
             return document
         if locations is not None and routes is not None:
+            unique_addresses, unique_priorities = self.remove_duplicated_addresses(addresses_locations, addresses_routes, priorities_locations, priorities_routes)
             document = {'depot_address': depot_address_locations,
-                        'addresses': addresses_locations + addresses_routes,
-                        'priorities': priorities_locations + priorities_routes,
+                        'addresses': unique_addresses,
+                        'priorities': unique_priorities,
                         'days': days_locations,
                         'distance_limit': distance_limit_locations,
                         'duration_limit': duration_limit_locations,
@@ -482,6 +485,18 @@ class RouteRepository():
                         'avoid_tolls': avoid_tolls_locations,
                         'routes_id': routes_id}
             return document
+
+    def remove_duplicated_addresses(self, addresses_locations, addresses_routes, priorities_locations, priorities_routes):
+        address_priority_mapping = dict(zip(addresses_locations + addresses_routes, priorities_locations + priorities_routes))
+        unique_addresses = []
+        unique_priorities = []
+        seen_addresses = set()
+        for address in addresses_locations + addresses_routes:
+            if address not in seen_addresses:
+                seen_addresses.add(address)
+                unique_addresses.append(address)
+                unique_priorities.append(address_priority_mapping[address])
+        return unique_addresses, unique_priorities
 
     def get_real_stats(self, route, avoid_tolls):
         locations = []
