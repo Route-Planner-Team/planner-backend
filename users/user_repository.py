@@ -23,6 +23,8 @@ class UserRepository:
         self.client: MongoClient = MongoClient(self.config.MONGO)
         self.db: Database = self.client.route_db
         self.users_collection: Collection = self.client.route_db.users
+        self.routes_collection: Collection = self.client.route_db.routes
+        self.locations_collection: Collection = self.client.route_db.locations
         logger.info("Inited repo")
 
     def create_user(self, body: dict) -> dict:
@@ -108,3 +110,18 @@ class UserRepository:
                 raise ValueError('An error occurred')
 
         return r.json()
+
+    def delete_user(self, uid):
+        try:
+            status = auth.delete_user(uid)
+            routes_resp = self.routes_collection.delete_many({"user_firebase_id": uid})
+            locations_resp = self.locations_collection.delete_many({'user_firebase_id': uid})
+            return {'message': 'User has been deleted'}
+
+        except auth.UserNotFoundError:
+            logger.error("User not found")
+            return {'error': 'User not found'}
+
+        except Exception as e:
+            logger.error(f"Error deleting user for UID {uid}: {str(e)}")
+            return {'error': str(e)}
