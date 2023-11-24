@@ -9,6 +9,7 @@ from firebase_admin import auth
 
 protected_endpoints = [
     "/auth/change-password",
+    "/auth/delete",
     "/routes",
     "/routes/active",
     "/routes/waypoint"
