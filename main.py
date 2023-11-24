@@ -172,6 +172,25 @@ def delete_user(request: Request):
         logger.error(f"ValueError: {error}")
         return JSONResponse(status_code=400, content={"error": error})
 
+@app.post("/auth/change-email")
+@logger.catch
+def change_email(request: Request, user: UserEmailModel):
+    uid = request.state.uid
+    if uid is None:
+        raise NotAuthenticated('User ID not found in token')
+
+    try:
+        status = user_repo.change_email(uid, user.email)
+        return status
+
+    except NotAuthenticated as e:
+        logger.error(f"Authentication error: {str(e)}")
+        return JSONResponse(status_code=401, content={"error": str(e)})
+
+    except ValueError as e:
+        error = str(e)
+        logger.error(f"ValueError: {error}")
+        return JSONResponse(status_code=400, content={"error": error})
 
 @app.get("/routes")
 @logger.catch

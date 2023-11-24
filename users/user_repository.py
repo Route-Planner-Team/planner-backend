@@ -125,3 +125,19 @@ class UserRepository:
         except Exception as e:
             logger.error(f"Error deleting user for UID {uid}: {str(e)}")
             return {'error': str(e)}
+
+    def change_email(self, uid, email):
+        try:
+            user = auth.get_user(uid)
+            if user.email == email:
+                return {'message': 'Provide new email'}
+            status = auth.update_user(uid, email=email)
+            return {'message': 'Email changed successfully'}
+
+        except auth.UserNotFoundError:
+            logger.error("User not found")
+            return {'error': 'User not found'}
+
+        except Exception as e:
+            logger.error("An error occured")
+            return {'error': str(e)}
