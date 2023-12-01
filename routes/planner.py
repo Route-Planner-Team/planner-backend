@@ -533,7 +533,15 @@ class RoutesPlanner():
                 city = component['long_name']
             if 'country' in types:
                 country = component['long_name']
+
         address_name = "{} {}, {} {}, {}".format(route, street_number, postal_code, city, country)
+
+        splitted_address_name = address_name.split(',')
+        if splitted_address_name[0] ==' ':
+            splitted_address_name[0] = splitted_address_name[1][1:]
+            cleaned_address = [element.strip() for element in splitted_address_name]
+            address_name = ', '.join(cleaned_address)
+
         return address_name
 
     # Function changes names of output values
