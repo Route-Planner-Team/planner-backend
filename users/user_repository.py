@@ -132,6 +132,7 @@ class UserRepository:
             if user.email == email:
                 return {'message': 'Provide new email'}
             status = auth.update_user(uid, email=email)
+            routes_resp = self.routes_collection.update_many({'user_firebase_id': user.uid}, {'$set': {'email': email}})
             return {'message': 'Email changed successfully'}
 
         except auth.UserNotFoundError:
