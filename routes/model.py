@@ -1,8 +1,9 @@
 from pydantic import BaseModel, constr, Field
-from typing import Optional
+from typing import Optional, List
 
 class RoutesModel(BaseModel):
     depot_address: str = Field(..., description="The address of the depot")
+    semi_depot_addresses: Optional[List[str]] = Field([], description="A list of semi depot addresses")
     addresses: list = Field([], description="A list of addresses")
     priorities: list = Field([], description="A list of priorities, can be 1,2 or 3 (higher, the more important")
     days: int = Field(..., description="The number of days, there will be that many routes")
