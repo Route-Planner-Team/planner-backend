@@ -45,6 +45,20 @@ class UserRepository:
         logger.info(f"Create new user {resp}")
         return resp
 
+    def create_user_external(self, token: str):
+        decoded_token = auth.verify_id_token(token)
+        email = decoded_token['email']
+        existing_user = auth.get_user_by_email(email)
+        if existing_user:
+            return 'User already exists'
+        firebase_user = auth.create_user(email=email)
+        resp = {
+            "email": firebase_user.email,
+            "user_firebase_id": firebase_user.uid
+        }
+        logger.info(f"Create new user {resp}")
+        return resp
+
     def get_user(self, body: dict) -> dict:
         """
         :param body: example {"email": "abc@gmail.com", "password": "qwe123"}
@@ -59,6 +73,33 @@ class UserRepository:
         })
 
         r = requests.post(firebase_request_url,data=payload)
+
+        response = r.json()
+
+        if 'error' in response:
+            error_message = response['error']['message']
+            if error_message == 'INVALID_PASSWORD':
+                raise ValueError('Invalid password')
+            else:
+                raise ValueError('An error occurred during authentication')
+
+        return response
+
+    def get_user_external(self, token: str, provider: str):
+        """
+            :param token: Authentication token obtained on the frontend
+            :param provider: Authentication provider (e.g., 'google.com' or 'facebook.com')
+        """
+
+        firebase_request_url = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyAssertion?key={config.Config.FIREBASE_API_KEY}"
+        payload = json.dumps({
+                'postBody': f'access_token={token}&providerId={provider}',
+                'requestUri': 'http://localhost',  # Set your redirect URI
+                'returnIdpCredential': True,
+                'returnSecureToken': True
+        })
+
+        r = requests.post(firebase_request_url, data=payload)
 
         response = r.json()
 

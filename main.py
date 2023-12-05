@@ -16,7 +16,7 @@ from routes.model import RoutesModel, WaypointModel, RegenerateModel, StatisticM
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
 from users.auth import authenticate_header
-from users.model import UserEmailModel, UserModel, UserModelChangePassword
+from users.model import UserEmailModel, UserModel, UserModelChangePassword, UserModelExternal
 from users.user_repository import UserRepository
 
 from datetime import datetime
@@ -84,6 +84,31 @@ def create_user(user: UserModel, status_code=201):
         error_message = str(e)
         return {'error': error_message}
 
+@app.post("/auth/sign-up/google")
+@logger.catch
+def create_user_google(user: UserModelExternal):
+    try:
+        status = user_repo.creat_user_external(user.token)
+        return status
+    except EmailAlreadyExistsError as e:
+        error_message = str(e)
+        return {'error': error_message}
+    except ValueError as e:
+        error_message = str(e)
+        return {'error': error_message}
+
+@app.post("/auth/sign-up/facebook")
+@logger.catch
+def create_user_facebook(user: UserModelExternal):
+    try:
+        status = user_repo.creat_user_external(user.token)
+        return status
+    except EmailAlreadyExistsError as e:
+        error_message = str(e)
+        return {'error': error_message}
+    except ValueError as e:
+        error_message = str(e)
+        return {'error': error_message}
 
 @app.post("/auth/sign-in")
 @logger.catch
@@ -111,6 +136,51 @@ def login_user(user: UserModel):
     except NotAuthenticated:
         return {"error": "Auth failed!"}
 
+@app.post("/auth/sign-in/google")
+@logger.catch
+def login_user(user: UserModelExternal):
+    try:
+        firebase_payload = user_repo.get_user_external(token=user.token, provider='google.com')
+        del firebase_payload['kind']
+        del firebase_payload['localId']
+        del firebase_payload['displayName']
+        del firebase_payload['registered']
+
+        change_key_name(firebase_payload, "expiresIn", "expires_in")
+        change_key_name(firebase_payload, "idToken", "access_token")
+        change_key_name(firebase_payload, "refreshToken", "refresh_token")
+
+        return firebase_payload
+
+    except ValueError as e:
+        error_message = str(e)
+        return {'error': error_message}
+
+    except NotAuthenticated:
+        return {"error": "Auth failed!"}
+
+@app.post("/auth/sign-in/facebook")
+@logger.catch
+def login_user(user: UserModelExternal):
+    try:
+        firebase_payload = user_repo.get_user_external(token=user.token, provider='facebook.com')
+        del firebase_payload['kind']
+        del firebase_payload['localId']
+        del firebase_payload['displayName']
+        del firebase_payload['registered']
+
+        change_key_name(firebase_payload, "expiresIn", "expires_in")
+        change_key_name(firebase_payload, "idToken", "access_token")
+        change_key_name(firebase_payload, "refreshToken", "refresh_token")
+
+        return firebase_payload
+
+    except ValueError as e:
+        error_message = str(e)
+        return {'error': error_message}
+
+    except NotAuthenticated:
+        return {"error": "Auth failed!"}
 
 @app.post("/auth/change-password")
 @logger.catch

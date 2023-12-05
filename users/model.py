@@ -5,6 +5,8 @@ class UserModel(BaseModel):
     email: str
     password: str
 
+class UserModelExternal(BaseModel):
+    token: str
 
 class UserModelChangePassword(BaseModel):
     new_password: str
