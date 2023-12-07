@@ -37,7 +37,7 @@ class UserRepository:
             email=body['email'],
             password=body['password']
         )
-
+        
         resp = {
             "email": firebase_user.email,
             "user_firebase_id": firebase_user.uid

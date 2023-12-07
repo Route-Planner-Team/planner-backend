@@ -10,6 +10,7 @@ from pymongo.results import InsertOneResult
 from fastapi import HTTPException
 
 import datetime
+import numpy as np
 from dateutil.parser import parse
 
 from config import Config
@@ -42,7 +43,7 @@ class RouteRepository():
         else:
             return dictionary
 
-    def create_user_route(self, uid: str, body: dict, days, distance_limit, duration_limit, preferences, avoid_tolls, routes_id):
+    def create_user_route(self, uid: str, body: dict, days, distance_limit, duration_limit, preferences, avoid_tolls, routes_id, overwrite):
         firebase_user = auth.get_user(uid)
 
         document = self.convert_dict_keys_to_str(body)
@@ -63,6 +64,12 @@ class RouteRepository():
         if routes_id is not None:
             routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
             if routes is not None:
+                if overwrite is True:
+                    self.routes_collection.replace_one({"_id": ObjectId(routes_id)}, document)
+                    self.locations_collection.delete_many({"routes_id": routes_id})
+                    document['routes_id'] = str(routes_id)
+                    transformed_document = self.transform_format(document, False)
+                    return transformed_document
                 completed_routes = self.get_completed_routes(routes)
                 document, new_days = self.merge_routes(document, completed_routes)
                 document['days'] = new_days
@@ -100,7 +107,8 @@ class RouteRepository():
                                     "visited": location["visited"],
                                     "should_keep": location["should_keep"],
                                     "polyline_to_next_point": location["polyline_to_next_point"],
-                                    "isDepot": location["isDepot"]
+                                    "isDepot": location["isDepot"],
+                                    "isSemiDepot": location["isSemiDepot"]
                                 }
                                 coords.append(point)
                             route = {
@@ -147,7 +155,8 @@ class RouteRepository():
                         "visited": location["visited"],
                         "should_keep": location["should_keep"],
                         "polyline_to_next_point": location["polyline_to_next_point"],
-                        "isDepot": location["isDepot"]
+                        "isDepot": location["isDepot"],
+                        "isSemiDepot": location["isSemiDepot"]
                     }
                     coords.append(point)
                 route = {
@@ -329,6 +338,7 @@ class RouteRepository():
             raise HTTPException(status_code=404, detail="Route already completed")
 
         depot_address = None
+        semi_depot_addresses = []
         name = None
 
         # Pass visited into right route
@@ -337,7 +347,9 @@ class RouteRepository():
             if isinstance(value, dict):
                 if 'coords' in value and isinstance(value['coords'], list):
                     for item in value['coords']:
-                        if item['isDepot'] is True:
+                        if item['isSemiDepot'] is True:
+                            semi_depot_addresses.append(item['name'])
+                        if item['isDepot'] is True and item['isSemiDepot'] is False:
                             depot_address = item['name']
                         if 'location_number' in item and item['location_number'] == location_number:
                             if item['visited'] is not None:
@@ -346,8 +358,14 @@ class RouteRepository():
                             name = item['name']
                             visited_changed = True
                             if visited is False and should_keep is True and item['isDepot'] is False:
-                                self.add_location_to_collection(routes_id, depot_address, item['name'], item['priority'], routes['days'], routes['distance_limit'], routes['duration_limit'], routes['preferences'], routes['avoid_tolls'], uid)
-                                item['should_keep'] = True
+                                if depot_address is None:
+                                    routes_to_search = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
+                                    found_name = routes_to_search['0']['coords'][0]['name']
+                                    self.add_location_to_collection(routes_id, found_name, semi_depot_addresses,item['name'], item['priority'], routes['days'],routes['distance_limit'], routes['duration_limit'],routes['preferences'], routes['avoid_tolls'], uid)
+                                    item['should_keep'] = True
+                                else:
+                                    self.add_location_to_collection(routes_id, depot_address, semi_depot_addresses, item['name'], item['priority'], routes['days'], routes['distance_limit'], routes['duration_limit'], routes['preferences'], routes['avoid_tolls'], uid)
+                                    item['should_keep'] = True
 
         # Check if location is in route
         if visited_changed is False:
@@ -393,12 +411,13 @@ class RouteRepository():
                 'date_of_completion': route[0][1]['date_of_completion'],
                 'routes_completed': all_routes_completed}
 
-    def add_location_to_collection(self, routes_id, depot_address, address, priority, days, distance_limit, duration_limit, preferences, avoid_tolls, uid):
+    def add_location_to_collection(self, routes_id, depot_address, semi_depot_addresses, address, priority, days, distance_limit, duration_limit, preferences, avoid_tolls, uid):
         # Check if there is a document with that routes
         routes = self.locations_collection.find_one({"routes_id": routes_id})
         if routes is None:
             # Create document for routes_id
             document = {'depot_address': depot_address,
+                        'semi_depot_addresses': semi_depot_addresses,
                         'addresses': [address],
                         'priorities': [priority],
                         'days': days,
@@ -414,6 +433,7 @@ class RouteRepository():
         else:
             # Update document
             document = {'depot_address': routes['depot_address'],
+                        'semi_depot_addresses': list(np.unique(routes['semi_depot_addresses'] + semi_depot_addresses)),
                         'addresses': routes['addresses'] + [address],
                         'priorities': routes['priorities'] + [priority],
                         'days': routes['days'],
@@ -426,11 +446,12 @@ class RouteRepository():
 
             res = self.locations_collection.replace_one({"routes_id": routes_id}, document)
 
-    def get_locations_to_regenerate(self, routes_id):
+    def get_locations_to_regenerate(self, routes_id, full_regeneration):
         #Get locations that were sent to be revisited
         locations = self.locations_collection.find_one({"routes_id": routes_id})
         if locations is not None:
             depot_address_locations = locations['depot_address']
+            semi_depot_locations = locations['semi_depot_addresses']
             addresses_locations = locations['addresses']
             priorities_locations = locations['priorities']
             days_locations = locations['days']
@@ -445,6 +466,7 @@ class RouteRepository():
             if routes['routes_completed'] is True and locations is None:
                 return {'message': 'No locations to regenerate'}
             depot_address_routes = None
+            semi_depot_routes = []
             addresses_routes = []
             priorities_routes = []
             days_routes = None
@@ -454,13 +476,25 @@ class RouteRepository():
             avoid_tolls_routes = None
             for key, value in routes.items():
                 if isinstance(value, dict):
-                    if value['completed'] is False:
+                    if full_regeneration is True:
                         for item in value['coords']:
-                            if item['isDepot'] is True:
+                            if item['isSemiDepot'] is True:
+                                semi_depot_routes.append(item['name'])
+                            if item['isDepot'] is True and item['isSemiDepot'] is False:
                                 depot_address_routes = item['name']
                             if item['isDepot'] is False:
                                 addresses_routes.append(item['name'])
                                 priorities_routes.append(item['priority'])
+                    else:
+                        if value['completed'] is False:
+                            for item in value['coords']:
+                                if item['isSemiDepot'] is True:
+                                    semi_depot_routes.append(item['name'])
+                                if item['isDepot'] is True and item['isSemiDepot'] is False:
+                                    depot_address_routes = item['name']
+                                if item['isDepot'] is False:
+                                    addresses_routes.append(item['name'])
+                                    priorities_routes.append(item['priority'])
                 if key == 'days':
                     days_routes = value
                 if key == 'distance_limit':
@@ -475,8 +509,21 @@ class RouteRepository():
         #Combine
         if locations is None and routes is None:
             return{'message': 'No locations to regenerate'}
+        if full_regeneration is True:
+            document = {'depot_address': depot_address_routes,
+                        'semi_depot_addresses': list(np.unique(semi_depot_routes)),
+                        'addresses': addresses_routes,
+                        'priorities': priorities_routes,
+                        'days': days_routes,
+                        'distance_limit': distance_limit_routes,
+                        'duration_limit': duration_limit_routes,
+                        'preferences': preferences_routes,
+                        'avoid_tolls': avoid_tolls_routes,
+                        'routes_id': routes_id}
+            return document
         if locations is not None and routes is None:
             document = {'depot_address': depot_address_locations,
+                        'semi_depot_addresses': list(np.unique(semi_depot_locations)),
                         'addresses': addresses_locations,
                         'priorities': priorities_locations,
                         'days': days_locations,
@@ -488,6 +535,7 @@ class RouteRepository():
             return document
         if locations is None and routes is not None:
             document = {'depot_address': depot_address_routes,
+                        'semi_depot_addresses': list(np.unique(semi_depot_routes)),
                         'addresses': addresses_routes,
                         'priorities': priorities_routes,
                         'days': days_routes,
@@ -500,6 +548,7 @@ class RouteRepository():
         if locations is not None and routes is not None:
             unique_addresses, unique_priorities = self.remove_duplicated_addresses(addresses_locations, addresses_routes, priorities_locations, priorities_routes)
             document = {'depot_address': depot_address_locations,
+                        'semi_depot_addresses': list(np.unique(semi_depot_locations + semi_depot_routes)),
                         'addresses': unique_addresses,
                         'priorities': unique_priorities,
                         'days': days_locations,
@@ -557,6 +606,7 @@ class RouteRepository():
         most_frequently_missed = []
         sum_of_priorities = {'Priority 1':0, 'Priority 2':0, 'Priority 3':0}
         most_frequent_depot = []
+        most_frequent_semi_depot = []
         all_locations_to_visit = []
         all_depots = []
 
@@ -567,7 +617,6 @@ class RouteRepository():
                     for key_in, value_in in value.items():
                         if isinstance(value_in, dict):
                             for location in value_in['coords']:
-                                print(location['name'])
                                 if location['visited'] in [True, False, None] and location['isDepot'] is False:
                                     all_locations_to_visit.append(location['name'])
                                 if location['isDepot'] is True:
@@ -602,12 +651,14 @@ class RouteRepository():
                                 if location['visited'] is False and location['isDepot'] is False:
                                     num_unvisited_loc = num_unvisited_loc + 1
                                     most_frequently_missed.append(location['name'])
+                                if location['isSemiDepot'] is True:
+                                    most_frequent_semi_depot.append(location['name'])
                                 if location['isDepot'] is True:
                                     most_frequent_depot.append(location['name'])
 
         return {'number_of_completed_routes': num_completed_routes,
                 'summed_distance_km': sum_distance,
-                'summed_duration_hours' : sum_duration,
+                'summed_duration_hours': sum_duration,
                 'summed_fuel_liters': sum_fuel,
                 'summed_days_of_week_to_complete': sum_days_of_week,
                 'number_of_visited_locations': num_visited_loc,
@@ -615,7 +666,8 @@ class RouteRepository():
                 'most_frequently_visited_locations': self.get_most_popular(most_frequently_visited),
                 'most_frequently_missed_locations': self.get_most_popular(most_frequently_missed),
                 'summed_visited_priorities': sum_of_priorities,
-                'most_frequent_depot': self.get_most_popular(most_frequent_depot, divide=True, all_addresses=False)}
+                'most_frequent_depot': self.get_most_popular(most_frequent_depot, divide=True, all_addresses=False),
+                'most_frequent_semi_depot': self.get_most_popular(most_frequent_semi_depot, divide=True, all_addresses=False)}
 
     def get_most_popular(self, locations, divide=False, all_addresses=False):
         locations_with_count = {}
@@ -626,7 +678,10 @@ class RouteRepository():
                 locations_with_count[location] = 1
 
         for location, count in locations_with_count.items():
-            locations_with_count[location] = count // 2 if divide is True else count
+            if divide:
+                count = (count + 1) // 2 if count % 2 != 0 else count // 2
+            locations_with_count[location] = count
+            #locations_with_count[location] = count // 2 if divide is True else count
 
         sorted_counts = sorted(locations_with_count.items(), key=lambda x: x[1])
         least_popular = sorted_counts[:3]

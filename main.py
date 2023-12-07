@@ -232,12 +232,13 @@ def active_routes_handler(request: Request):
 
 @app.post("/routes")
 @logger.catch
-def routes_post_handler(request: Request, routes: RoutesModel, routes_id: str = None):
+def routes_post_handler(request: Request, routes: RoutesModel, routes_id: str = None, overwrite: bool = False):
     uid = request.state.uid
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
     try:
         calculated_routes = routes_planner.get_routes(routes.depot_address,
+                                                      routes.semi_depot_addresses,
                                                       routes.addresses,
                                                       routes.priorities,
                                                       routes.days,
@@ -246,7 +247,7 @@ def routes_post_handler(request: Request, routes: RoutesModel, routes_id: str = 
                                                       routes.preferences,
                                                       routes.avoid_tolls)
 
-        routes = routes_repo.create_user_route(uid, calculated_routes, routes.days, routes.distance_limit, routes.duration_limit, routes.preferences, routes.avoid_tolls, routes_id)
+        routes = routes_repo.create_user_route(uid, calculated_routes, routes.days, routes.distance_limit, routes.duration_limit, routes.preferences, routes.avoid_tolls, routes_id, overwrite)
 
     except ValueError as e:
         error = str(e)
@@ -306,14 +307,14 @@ def change_name_of_routes(request: Request, rename: RenameModel):
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
-@app.get("/routes/regenerate")
+@app.post("/routes/regenerate")
 @logger.catch
-def regenerate_routes(request: Request, regenerate: RegenerateModel):
+def regenerate_routes(request: Request, regenerate: RegenerateModel, full_regeneration: bool = False):
     uid = request.state.uid
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
     try:
-        locations = routes_repo.get_locations_to_regenerate(regenerate.routes_id)
+        locations = routes_repo.get_locations_to_regenerate(regenerate.routes_id, full_regeneration)
         return locations
     except HTTPException as e:
         return JSONResponse(status_code=e.status_code, content={"error": e.detail})

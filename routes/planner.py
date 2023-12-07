@@ -1,4 +1,5 @@
 import pandas as pd
+from geopy.distance import geodesic
 from sklearn.cluster import KMeans
 from config import Config
 import googlemaps
@@ -85,59 +86,59 @@ class RoutesPlanner():
         return ordered_addresses
 
     # Function returns correct waypoints order for whole route (all priorities)
-    def get_all_waypoints(self, avoid_tolls, priority3_addresses, priority2_addresses, priority1_addresses, depot, p2_center,
-                          p1_center):
+    def get_all_waypoints(self, avoid_tolls, priority3_addresses, priority2_addresses, priority1_addresses, start_depot, end_depot,
+                          p2_center, p1_center):
 
         # There are several combinations, number in a string says that there is at least one location with that priority
         # 321, 32, 31, 3, 21, 2, 1
         if len(priority3_addresses) >= 1 and len(priority2_addresses) >= 1 and len(priority1_addresses) >= 1:
             ordered_addresses = []
-            ordered_addresses1 = self.set_waypoints(avoid_tolls, depot, priority3_addresses, p2_center)
+            ordered_addresses1 = self.set_waypoints(avoid_tolls, start_depot, priority3_addresses, p2_center)
             ordered_addresses = ordered_addresses + ordered_addresses1
 
             ordered_addresses2 = self.set_waypoints(avoid_tolls, ordered_addresses[-1], priority2_addresses, p1_center)
             ordered_addresses = ordered_addresses + ordered_addresses2
 
-            ordered_addresses3 = self.set_waypoints(avoid_tolls, ordered_addresses[-1], priority1_addresses, depot)
+            ordered_addresses3 = self.set_waypoints(avoid_tolls, ordered_addresses[-1], priority1_addresses, end_depot)
             ordered_addresses = ordered_addresses + ordered_addresses3
 
         if len(priority3_addresses) >= 1 and len(priority2_addresses) >= 1 and len(priority1_addresses) < 1:
             ordered_addresses = []
-            ordered_addresses1 = self.set_waypoints(avoid_tolls, depot, priority3_addresses, p2_center)
+            ordered_addresses1 = self.set_waypoints(avoid_tolls, start_depot, priority3_addresses, p2_center)
             ordered_addresses = ordered_addresses + ordered_addresses1
 
-            ordered_addresses2 = self.set_waypoints(avoid_tolls, ordered_addresses[-1], priority2_addresses, depot)
+            ordered_addresses2 = self.set_waypoints(avoid_tolls, ordered_addresses[-1], priority2_addresses, end_depot)
             ordered_addresses = ordered_addresses + ordered_addresses2
 
         if len(priority3_addresses) >= 1 and len(priority2_addresses) < 1 and len(priority1_addresses) >= 1:
             ordered_addresses = []
-            ordered_addresses1 = self.set_waypoints(avoid_tolls, depot, priority3_addresses, p1_center)
+            ordered_addresses1 = self.set_waypoints(avoid_tolls, start_depot, priority3_addresses, p1_center)
             ordered_addresses = ordered_addresses + ordered_addresses1
 
-            ordered_addresses2 = self.set_waypoints(avoid_tolls, ordered_addresses[-1], priority1_addresses, depot)
+            ordered_addresses2 = self.set_waypoints(avoid_tolls, ordered_addresses[-1], priority1_addresses, end_depot)
             ordered_addresses = ordered_addresses + ordered_addresses2
 
         if len(priority3_addresses) >= 1 and len(priority2_addresses) < 1 and len(priority1_addresses) < 1:
             ordered_addresses = []
-            ordered_addresses1 = self.set_waypoints(avoid_tolls, depot, priority3_addresses, depot)
+            ordered_addresses1 = self.set_waypoints(avoid_tolls, start_depot, priority3_addresses, end_depot)
             ordered_addresses = ordered_addresses + ordered_addresses1
 
         if len(priority3_addresses) < 1 and len(priority2_addresses) >= 1 and len(priority1_addresses) >= 1:
             ordered_addresses = []
-            ordered_addresses1 = self.set_waypoints(avoid_tolls, depot, priority2_addresses, p1_center)
+            ordered_addresses1 = self.set_waypoints(avoid_tolls, start_depot, priority2_addresses, p1_center)
             ordered_addresses = ordered_addresses + ordered_addresses1
 
-            ordered_addresses2 = self.set_waypoints(avoid_tolls, ordered_addresses[-1], priority1_addresses, depot)
+            ordered_addresses2 = self.set_waypoints(avoid_tolls, ordered_addresses[-1], priority1_addresses, end_depot)
             ordered_addresses = ordered_addresses + ordered_addresses2
 
         if len(priority3_addresses) < 1 and len(priority2_addresses) >= 1 and len(priority1_addresses) < 1:
             ordered_addresses = []
-            ordered_addresses1 = self.set_waypoints(avoid_tolls, depot, priority2_addresses, depot)
+            ordered_addresses1 = self.set_waypoints(avoid_tolls, start_depot, priority2_addresses, end_depot)
             ordered_addresses = ordered_addresses + ordered_addresses1
 
         if len(priority3_addresses) < 1 and len(priority2_addresses) < 1 and len(priority1_addresses) >= 1:
             ordered_addresses = []
-            ordered_addresses1 = self.set_waypoints(avoid_tolls, depot, priority1_addresses, depot)
+            ordered_addresses1 = self.set_waypoints(avoid_tolls, start_depot, priority1_addresses, end_depot)
             ordered_addresses = ordered_addresses + ordered_addresses1
 
         return ordered_addresses
@@ -329,14 +330,127 @@ class RoutesPlanner():
 
     # Function takes data in DataFrame format and converted coordinates of our addresses
     # In this function we set optimal order of the waypoints in every route
-    def set_optimal_waypoints(self, avoid_tolls, df, depot_address):
+    def set_optimal_waypoints(self, avoid_tolls, df, depot_address, semi_depot_addresses_coords):
+
+        ordered = []
+        # Put semi depots in right place
+        if len(semi_depot_addresses_coords) != 0:
+            centroids = df.groupby('label').agg({'lat': 'mean', 'lng': 'mean'}).reset_index()
+
+            # Calculate distances to semi-depot addresses and add as new columns
+            for i, address in enumerate(semi_depot_addresses_coords):
+                dist_col = f'distance_to_{i}'
+
+                centroids[dist_col] = centroids.apply(lambda row: gmaps.distance_matrix(
+                    origins=(row['lat'], row['lng']),
+                    destinations=(address['lat'], address['lng']),
+                    mode='driving')['rows'][0]['elements'][0]['distance']['value'], axis=1)
+
+            if len(semi_depot_addresses_coords) == 1:
+                df_sorted = centroids.sort_values(by='distance_to_0')
+                min_label = int(df_sorted.iloc[0]['label'])
+                df_sorted = df_sorted.drop(df_sorted[df_sorted['label'] == min_label].index)
+                second_label = int(df_sorted.iloc[0]['label'])
+                order = {min_label: [-1, 0], second_label: [0, -1]}
+                ordered = dict(sorted(order.items()))
+            if len(semi_depot_addresses_coords) == 2:
+                min_distance_label_0 = int(centroids.loc[centroids['distance_to_0'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_0].index)
+                centroids['distance_sum_01'] = centroids['distance_to_0'] + centroids['distance_to_1']
+                min_distance_label_01 = int(centroids.loc[centroids['distance_sum_01'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_01].index)
+                min_distance_label_1 = int(centroids.loc[centroids['distance_to_1'].idxmin()]['label'])
+                order = {min_distance_label_0: [-1, 0], min_distance_label_01: [0, 1], min_distance_label_1: [1, -1]}
+                ordered = dict(sorted(order.items()))
+            if len(semi_depot_addresses_coords) == 3:
+                min_distance_label_0 = int(centroids.loc[centroids['distance_to_0'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_0].index)
+                centroids['distance_sum_01'] = centroids['distance_to_0'] + centroids['distance_to_1']
+                min_distance_label_01 = int(centroids.loc[centroids['distance_sum_01'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_01].index)
+                centroids['distance_sum_12'] = centroids['distance_to_1'] + centroids['distance_to_2']
+                min_distance_label_12 = int(centroids.loc[centroids['distance_sum_12'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_12].index)
+                min_distance_label_2 = int(centroids.loc[centroids['distance_to_2'].idxmin()]['label'])
+                order = {min_distance_label_0: [-1, 0], min_distance_label_01: [0, 1], min_distance_label_12: [1, 2], min_distance_label_2: [2,-1]}
+                ordered = dict(sorted(order.items()))
+            if len(semi_depot_addresses_coords) == 4:
+                min_distance_label_0 = int(centroids.loc[centroids['distance_to_0'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_0].index)
+                centroids['distance_sum_01'] = centroids['distance_to_0'] + centroids['distance_to_1']
+                min_distance_label_01 = int(centroids.loc[centroids['distance_sum_01'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_01].index)
+                centroids['distance_sum_12'] = centroids['distance_to_1'] + centroids['distance_to_2']
+                min_distance_label_12 = int(centroids.loc[centroids['distance_sum_12'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_12].index)
+                centroids['distance_sum_23'] = centroids['distance_to_2'] + centroids['distance_to_3']
+                min_distance_label_23 = int(centroids.loc[centroids['distance_sum_23'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_23].index)
+                min_distance_label_3 = int(centroids.loc[centroids['distance_to_3'].idxmin()]['label'])
+                order = {min_distance_label_0: [-1, 0], min_distance_label_01: [0, 1], min_distance_label_12: [1, 2], min_distance_label_23: [2, 3], min_distance_label_3: [3, -1]}
+                ordered = dict(sorted(order.items()))
+            if len(semi_depot_addresses_coords) == 5:
+                min_distance_label_0 = int(centroids.loc[centroids['distance_to_0'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_0].index)
+                centroids['distance_sum_01'] = centroids['distance_to_0'] + centroids['distance_to_1']
+                min_distance_label_01 = int(centroids.loc[centroids['distance_sum_01'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_01].index)
+                centroids['distance_sum_12'] = centroids['distance_to_1'] + centroids['distance_to_2']
+                min_distance_label_12 = int(centroids.loc[centroids['distance_sum_12'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_12].index)
+                centroids['distance_sum_23'] = centroids['distance_to_2'] + centroids['distance_to_3']
+                min_distance_label_23 = int(centroids.loc[centroids['distance_sum_23'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_23].index)
+                centroids['distance_sum_34'] = centroids['distance_to_3'] + centroids['distance_to_4']
+                min_distance_label_34 = int(centroids.loc[centroids['distance_sum_34'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_34].index)
+                min_distance_label_4 = int(centroids.loc[centroids['distance_to_4'].idxmin()]['label'])
+                order = {min_distance_label_0: [-1, 0], min_distance_label_01: [0, 1], min_distance_label_12: [1, 2], min_distance_label_23: [2, 3], min_distance_label_34: [3, 4], min_distance_label_4: [4, -1]}
+                ordered = dict(sorted(order.items()))
+            if len(semi_depot_addresses_coords) == 6:
+                min_distance_label_0 = int(centroids.loc[centroids['distance_to_0'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_0].index)
+                centroids['distance_sum_01'] = centroids['distance_to_0'] + centroids['distance_to_1']
+                min_distance_label_01 = int(centroids.loc[centroids['distance_sum_01'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_01].index)
+                centroids['distance_sum_12'] = centroids['distance_to_1'] + centroids['distance_to_2']
+                min_distance_label_12 = int(centroids.loc[centroids['distance_sum_12'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_12].index)
+                centroids['distance_sum_23'] = centroids['distance_to_2'] + centroids['distance_to_3']
+                min_distance_label_23 = int(centroids.loc[centroids['distance_sum_23'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_23].index)
+                centroids['distance_sum_34'] = centroids['distance_to_3'] + centroids['distance_to_4']
+                min_distance_label_34 = int(centroids.loc[centroids['distance_sum_34'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_34].index)
+                centroids['distance_sum_45'] = centroids['distance_to_4'] + centroids['distance_to_5']
+                min_distance_label_45 = int(centroids.loc[centroids['distance_sum_45'].idxmin()]['label'])
+                centroids = centroids.drop(centroids[centroids['label'] == min_distance_label_45].index)
+                min_distance_label_5 = int(centroids.loc[centroids['distance_to_5'].idxmin()]['label'])
+                order = {min_distance_label_0: [-1, 0], min_distance_label_01: [0, 1], min_distance_label_12: [1, 2], min_distance_label_23: [2, 3], min_distance_label_34: [3, 4], min_distance_label_45: [4, 5], min_distance_label_5: [5, -1]}
+                ordered = dict(sorted(order.items()))
 
         # For every cluster(route)
         routes = {}
         for label in range(0, len(df['label'].unique())):
 
-            # Convert lat and lng to tuple
-            depot = (depot_address['lat'], depot_address['lng'])
+            if len(ordered) != 0:
+                start = ordered[label][0]
+                end = ordered[label][1]
+                if start == -1:
+                    start_depot = (depot_address['lat'], depot_address['lng'])
+                if start != -1:
+                    start_depot = (semi_depot_addresses_coords[start]['lat'], semi_depot_addresses_coords[start]['lng'])
+                if end == -1:
+                    end_depot = (depot_address['lat'], depot_address['lng'])
+                if end != -1:
+                    end_depot = (semi_depot_addresses_coords[end]['lat'], semi_depot_addresses_coords[end]['lng'])
+                items = list(ordered.items())
+                sorted_items = sorted(items, key=lambda x: x[1][0])
+                order_of_routes = [key for key, _ in sorted_items]
+            else:
+                start_depot = (depot_address['lat'], depot_address['lng'])
+                end_depot = (depot_address['lat'], depot_address['lng'])
+
             df_label = df[df['label'] == label]
 
             # Create dataframe for every priority
@@ -354,10 +468,10 @@ class RoutesPlanner():
 
             # Get ordered waypoints for whole route
             ordered_addresses = self.get_all_waypoints(avoid_tolls, priority3_addresses, priority2_addresses, priority1_addresses,
-                                                  depot, p2_center, p1_center)
+                                                  start_depot, end_depot, p2_center, p1_center)
 
             # Whole route in the correct order, including depot
-            waypoints = [depot] + ordered_addresses + [depot]
+            waypoints = [start_depot] + ordered_addresses + [end_depot]
 
             # Calculate distance and duration for whole route
             total_distance, total_duration, polyline, polylines = self.get_distance_duration(avoid_tolls, waypoints)
@@ -372,6 +486,8 @@ class RoutesPlanner():
 
             routes[label] = [waypoints, total_distance, total_duration, total_fuel, polyline, polylines]
 
+        if len(ordered) != 0:
+            routes = {index: routes[index] for index in order_of_routes}
         return routes
 
     # Function take dict with optimized routes
@@ -545,8 +661,10 @@ class RoutesPlanner():
         return address_name
 
     # Function changes names of output values
-    def add_parameter_names_to_output(self, routes, addresses_priorities_dict):
+    def add_parameter_names_to_output(self, routes, addresses_priorities_dict, semi_depot_addresses):
         routes_dict = {}
+        original_keys = list(routes.keys())
+        routes = {i: routes[key] for i, key in enumerate(original_keys)}
         for key, value in routes.items():
             routes_dict[key] = {
                 'coords': value[0],
@@ -571,18 +689,20 @@ class RoutesPlanner():
                                            'visited': None,
                                            'should_keep': None,
                                            'polyline_to_next_point': None,
-                                           'isDepot': i == 0 or i == len(routes_dict[key]['coords']) - 1} for i, coord in enumerate(routes_dict[key]['coords'])]
+                                           'isDepot': i == 0 or i == len(routes_dict[key]['coords']) - 1,
+                                           'isSemiDepot': self.add_address_name(coord[0], coord[1]) in semi_depot_addresses} for i, coord in enumerate(routes_dict[key]['coords'])]
         for i in range(len(polylines)):
             for j in range(len(polylines[i])):
                 routes_dict[i]['coords'][j]['polyline_to_next_point'] = polylines[i][j]
 
         return routes_dict
 
-    def get_routes(self, depot_address, addresses, priorities, days, distance_limit, duration_limit, preferences, avoid_tolls):
+    def get_routes(self, depot_address, semi_depot_addresses, addresses, priorities, days, distance_limit, duration_limit, preferences, avoid_tolls):
         '''
         Function generates n routes, returns a dict of all addresses in correct order including depot
         Params:
         - depot address - address of our depot (string)
+        - semi_depot_addresses - all semi depot addresses (list of strings)
         - addresses - all addresses we have to visit (list of strings)
         - priorities - can be 1,2,3. Location with higher priority are firstly visited
         - days - indicates number of routes (int)
@@ -595,8 +715,20 @@ class RoutesPlanner():
         # Convert depot address to coords
         depot_coords = self.get_depot_coords(depot_address)
 
-        # Convert addresses of addresses to coords
+        # Convert list of addresses to coords
         addresses_coords = self.get_addresses_coords(addresses)
+
+        # Convert list of semi_depot_addresses to coords
+        if days > 7:
+            raise ValueError('Maximum number of days is 7')
+        if days > len(addresses):
+            raise ValueError('To little addresses')
+        if len(semi_depot_addresses) != 0:
+            if days - len(semi_depot_addresses) != 1:
+                raise ValueError('Number of semi depots must equal days - 1')
+            semi_depot_addresses_coords = self.get_addresses_coords(semi_depot_addresses)
+        if len(semi_depot_addresses) == 0:
+            semi_depot_addresses_coords = []
 
         # Dict to save proper priority in db
         addresses_priorities_dict = {key: value for key, value in zip([(address['lat'], address['lng']) for address in addresses_coords], priorities)}
@@ -611,7 +743,7 @@ class RoutesPlanner():
         df_addresses['priority'] = priorities
 
         # Prepare all points, set waypoints
-        routes = self.set_optimal_waypoints(avoid_tolls, df_addresses, depot_coords)
+        routes = self.set_optimal_waypoints(avoid_tolls, df_addresses, depot_coords, semi_depot_addresses_coords)
 
         # Calculate distance, duration and consumption
         distances = self.calculate_distances(routes)
@@ -625,12 +757,12 @@ class RoutesPlanner():
         # We will generate more possible routes if there is more than 1 day
         # Loop has to be short because long loop would affect efficiency of our function badly
         # Additionally in every iteration there is google maps API request, so to many requests could cause fees!
-        if days > 1:
-            for day in range(1, days):
-                df_addresses = self.reorganise_routes(routes, distances, df_addresses)
-                routes = self.set_optimal_waypoints(avoid_tolls, df_addresses, depot_coords)
-                distances = self.calculate_distances(routes)
-                all_routes.append(routes)
+        #if days > 1:
+        #    for day in range(1, days):
+        #        df_addresses = self.reorganise_routes(routes, distances, df_addresses)
+        #        routes = self.set_optimal_waypoints(avoid_tolls, df_addresses, depot_coords, semi_depot_addresses_coords)
+        #        distances = self.calculate_distances(routes)
+        #        all_routes.append(routes)
 
         # Check if any route does not break daily limitation
         all_routes = self.check_limitations(all_routes, distance_limit, duration_limit)
@@ -651,6 +783,6 @@ class RoutesPlanner():
                 routes = self.choose_min_routes(all_routes, 'fuel')
 
         # Change names of output values
-        routes = self.add_parameter_names_to_output(routes, addresses_priorities_dict)
+        routes = self.add_parameter_names_to_output(routes, addresses_priorities_dict, semi_depot_addresses)
 
         return routes
