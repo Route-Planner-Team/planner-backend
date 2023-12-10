@@ -1,0 +1,10 @@
+version: '2'
+services:
+  planner-backend:
+    image: your-image-registry/planner-back:latest
+    build:
+      context: .
+    ports:
+      - '8000:8000'
+    healthcheck:
+      disable: true
