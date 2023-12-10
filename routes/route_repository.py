@@ -714,6 +714,9 @@ class RouteRepository():
         routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
         if routes is None:
             raise HTTPException(status_code=404, detail="Routes not found")
+        routes_name = self.routes_collection.find_one({"name": name})
+        if routes_name is not None:
+            raise HTTPException(status_code=404, detail="Routes with that name already exists")
         self.routes_collection.update_one({'_id': ObjectId(routes_id)}, {'$set': {'name': name}})
         return {
             "routes_id": str(routes['_id']),
