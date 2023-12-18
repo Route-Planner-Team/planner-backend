@@ -37,10 +37,30 @@ class UserRepository:
             email=body['email'],
             password=body['password']
         )
-        
+
+        # get token for verification request
+        firebase_request_url = f"https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key={config.Config.FIREBASE_API_KEY}"
+        payload = json.dumps({
+            'email': body['email'],
+            'password': body['password'],
+            "returnSecureToken": True
+        })
+        r = requests.post(firebase_request_url, data=payload)
+        response = r.json()
+        idToken = response['idToken']
+
+        # verify email
+        rest_api_url = "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode"
+        data = {"requestType": "VERIFY_EMAIL", "email": body['email'], "idToken": idToken}
+
+        r = requests.post(rest_api_url,
+                          params={'key': config.Config.FIREBASE_API_KEY},
+                          data=data)
+
         resp = {
             "email": firebase_user.email,
-            "user_firebase_id": firebase_user.uid
+            "user_firebase_id": firebase_user.uid,
+            "verified": False
         }
         logger.info(f"Create new user {resp}")
         return resp
@@ -58,7 +78,7 @@ class UserRepository:
             "returnSecureToken": True
         })
 
-        r = requests.post(firebase_request_url,data=payload)
+        r = requests.post(firebase_request_url, data=payload)
 
         response = r.json()
 
@@ -66,10 +86,16 @@ class UserRepository:
             error_message = response['error']['message']
             if error_message == 'INVALID_PASSWORD':
                 raise ValueError('Invalid password')
+            elif error_message == 'EMAIL_NOT_FOUND':
+                raise ValueError('No user for that email')
             else:
                 raise ValueError('An error occurred during authentication')
 
-        return response
+        firebase_user = auth.get_user_by_email(body['email'])
+        if firebase_user.email_verified:
+            return response
+        else:
+            raise ValueError('Email not verified')
 
     def change_password(self, uid, body: dict) -> dict:
         """
