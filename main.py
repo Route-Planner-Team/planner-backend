@@ -83,7 +83,9 @@ def create_user(user: UserModel, status_code=201):
     except EmailAlreadyExistsError as e:
         error_message = str(e)
         return {'error': error_message}
-
+    except ValueError as e:
+        error_message = str(e)
+        return {'error': error_message}
 
 @app.post("/auth/sign-in")
 @logger.catch
