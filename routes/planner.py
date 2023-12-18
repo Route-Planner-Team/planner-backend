@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from geopy.distance import geodesic
 from sklearn.cluster import KMeans
 from config import Config
@@ -670,9 +671,9 @@ class RoutesPlanner():
                 'coords': value[0],
                 'completed': False,
                 'date_of_completion': None,
-                'distance_km': value[1],
-                'duration_hours': value[2] / 60,
-                'fuel_liters': value[3],
+                'distance_km': np.round(value[1], 2),
+                'duration_hours': np.round(value[2] / 60, 2),
+                'fuel_liters': np.round(value[3], 2),
                 'polyline': value[4],
                 'route_number': key
             }

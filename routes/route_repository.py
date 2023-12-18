@@ -657,9 +657,9 @@ class RouteRepository():
                                     most_frequent_depot.append(location['name'])
 
         return {'number_of_completed_routes': num_completed_routes,
-                'summed_distance_km': sum_distance,
-                'summed_duration_hours': sum_duration,
-                'summed_fuel_liters': sum_fuel,
+                'summed_distance_km': np.round(sum_distance, 2),
+                'summed_duration_hours': np.round(sum_duration, 2),
+                'summed_fuel_liters': np.round(sum_fuel, 2),
                 'summed_days_of_week_to_complete': sum_days_of_week,
                 'number_of_visited_locations': num_visited_loc,
                 'number_of_unvisited_locations': num_unvisited_loc,
