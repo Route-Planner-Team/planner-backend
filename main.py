@@ -319,7 +319,7 @@ def regenerate_routes(request: Request, regenerate: RegenerateModel, full_regene
     except HTTPException as e:
         return JSONResponse(status_code=e.status_code, content={"error": e.detail})
 
-@app.get("/stats")
+@app.post("/stats")
 @logger.catch
 def get_statistics(request: Request, statistics: StatisticModel):
     uid = request.state.uid
