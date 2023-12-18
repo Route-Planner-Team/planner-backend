@@ -252,6 +252,8 @@ def routes_post_handler(request: Request, routes: RoutesModel, routes_id: str = 
     except ValueError as e:
         error = str(e)
         return JSONResponse(status_code=400, content={"error": error})
+    except IndexError as e:
+        return JSONResponse(status_code=400, content={"error": "Can not compute routes for those locations"})
 
     return routes
 
