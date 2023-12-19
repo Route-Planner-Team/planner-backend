@@ -13,7 +13,7 @@ def client():
 
 @pytest.fixture
 def user_data():
-    return {"email": "testowy23@gmail.com", "password": "test123!"}
+    return {"email": "route_planner_test@interia.pl", "password": "test123!"}
 
 @pytest.fixture
 def auth_header(user_data, client):
@@ -39,4 +39,31 @@ def test_change_password(client, auth_header):
 
     response = client.post("/auth/change-password", json=params, headers=auth_header).json()
 
-    assert response['email'] == 'testowy23@gmail.com'
+    assert response['email'] == 'route_planner_test@interia.pl'
+
+def test_change_email(client, auth_header):
+    params = {
+        "email": "route_planner_test2@interia.pl"
+    }
+
+    response = client.post("/auth/change-email", json=params, headers=auth_header).json()
+
+    assert response['message'] == "Email changed successfully"
+
+    params = {
+        "email": "route_planner_test@interia.pl"
+    }
+
+    response = client.post("/auth/change-email", json=params, headers=auth_header).json()
+
+    assert response['message'] == "Email changed successfully"
+
+def test_forgot_password(client):
+    params = {
+        "email": "route_planner_test@interia.pl"
+    }
+
+    response = client.post("/auth/forgot-password", json=params).json()
+
+    assert response['email'] == "route_planner_test@interia.pl"
+
