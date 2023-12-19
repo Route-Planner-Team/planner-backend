@@ -8,6 +8,7 @@ from pymongo.collection import Collection
 from pymongo.database import Database
 from pymongo.results import InsertOneResult
 from fastapi import HTTPException
+import googlemaps
 
 import datetime
 import numpy as np
@@ -19,6 +20,8 @@ cfg = Config()
 
 from routes.planner import RoutesPlanner
 routes_planner = RoutesPlanner(cfg)
+
+gmaps = googlemaps.Client(key=Config.GOOGLEMAPS_API_KEY)
 
 
 class RouteRepository():
@@ -623,8 +626,15 @@ class RouteRepository():
                                     all_depots.append(location['name'])
             all_addresses = all_locations_to_visit + self.remove_half_duplicates(all_depots)
             all_addresses = self.get_most_popular(all_addresses, divide=False, all_addresses=True)
-            transformed_addresses = [{'address': address, 'count': count} for address, count in all_addresses]
-            return {'addresses': transformed_addresses}
+            transformed_addresses = [{'name': address, 'count': count} for address, count in all_addresses]
+            for location in transformed_addresses:
+                location['latitude'] = gmaps.geocode(location['name'])[0]['geometry']['location']['lat']
+                location['longitude'] = gmaps.geocode(location['name'])[0]['geometry']['location']['lng']
+            reordered_transformed_addresses = [{'latitude': location['latitude'],
+                                                'longitude': location['longitude'],
+                                                'name': location['name'],
+                                                'count': location['count']} for location in transformed_addresses]
+            return {'addresses': reordered_transformed_addresses}
 
         for key, value in routes.items():
             if isinstance(value, dict):
