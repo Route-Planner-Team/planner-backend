@@ -758,12 +758,12 @@ class RoutesPlanner():
         # We will generate more possible routes if there is more than 1 day
         # Loop has to be short because long loop would affect efficiency of our function badly
         # Additionally in every iteration there is google maps API request, so to many requests could cause fees!
-        #if days > 1:
-        #    for day in range(1, days):
-        #        df_addresses = self.reorganise_routes(routes, distances, df_addresses)
-        #        routes = self.set_optimal_waypoints(avoid_tolls, df_addresses, depot_coords, semi_depot_addresses_coords)
-        #        distances = self.calculate_distances(routes)
-        #        all_routes.append(routes)
+        if days > 1:
+            for day in range(1, days):
+                df_addresses = self.reorganise_routes(routes, distances, df_addresses)
+                routes = self.set_optimal_waypoints(avoid_tolls, df_addresses, depot_coords, semi_depot_addresses_coords)
+                distances = self.calculate_distances(routes)
+                all_routes.append(routes)
 
         # Check if any route does not break daily limitation
         all_routes = self.check_limitations(all_routes, distance_limit, duration_limit)
