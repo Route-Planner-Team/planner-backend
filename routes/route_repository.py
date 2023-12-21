@@ -513,9 +513,22 @@ class RouteRepository():
         if locations is None and routes is None:
             return{'message': 'No locations to regenerate'}
         if full_regeneration is True:
-            document = {'depot_address': depot_address_routes,
-                        'semi_depot_addresses': list(np.unique(semi_depot_routes)),
-                        'addresses': addresses_routes,
+
+            if len(list(np.unique(semi_depot_routes))) != 0:
+                semi_depot_with_coords = self.add_coords_to_addresses(list(np.unique(semi_depot_routes)))
+            else:
+                semi_depot_with_coords = []
+
+            if len(addresses_routes) != 0:
+                addresses_with_coords = self.add_coords_to_addresses(addresses_routes)
+            else:
+                addresses_with_coords = []
+
+            document = {'depot_address': {'name': depot_address_routes,
+                                          'latitude': gmaps.geocode(depot_address_routes)[0]['geometry']['location']['lat'],
+                                          'longitude': gmaps.geocode(depot_address_routes)[0]['geometry']['location']['lng']},
+                        'semi_depot_addresses': semi_depot_with_coords,
+                        'addresses': addresses_with_coords,
                         'priorities': priorities_routes,
                         'days': days_routes,
                         'distance_limit': distance_limit_routes,
@@ -525,9 +538,22 @@ class RouteRepository():
                         'routes_id': routes_id}
             return document
         if locations is not None and routes is None:
-            document = {'depot_address': depot_address_locations,
-                        'semi_depot_addresses': list(np.unique(semi_depot_locations)),
-                        'addresses': addresses_locations,
+
+            if len(list(np.unique(semi_depot_locations))) != 0:
+                semi_depot_with_coords = self.add_coords_to_addresses(list(np.unique(semi_depot_locations)))
+            else:
+                semi_depot_with_coords = []
+
+            if len(addresses_locations) != 0:
+                addresses_with_coords = self.add_coords_to_addresses(addresses_locations)
+            else:
+                addresses_with_coords = []
+
+            document = {'depot_address': {'name': depot_address_locations,
+                                          'latitude': gmaps.geocode(depot_address_locations)[0]['geometry']['location']['lat'],
+                                          'longitude': gmaps.geocode(depot_address_locations)[0]['geometry']['location']['lng']},
+                        'semi_depot_addresses': semi_depot_with_coords,
+                        'addresses': addresses_with_coords,
                         'priorities': priorities_locations,
                         'days': days_locations,
                         'distance_limit': distance_limit_locations,
@@ -537,9 +563,22 @@ class RouteRepository():
                         'routes_id': routes_id}
             return document
         if locations is None and routes is not None:
-            document = {'depot_address': depot_address_routes,
-                        'semi_depot_addresses': list(np.unique(semi_depot_routes)),
-                        'addresses': addresses_routes,
+
+            if len(list(np.unique(semi_depot_routes))) != 0:
+                semi_depot_with_coords = self.add_coords_to_addresses(list(np.unique(semi_depot_routes)))
+            else:
+                semi_depot_with_coords = []
+
+            if len(addresses_routes) != 0:
+                addresses_with_coords = self.add_coords_to_addresses(addresses_routes)
+            else:
+                addresses_with_coords = []
+
+            document = {'depot_address': {'name': depot_address_routes,
+                                          'latitude': gmaps.geocode(depot_address_routes)[0]['geometry']['location']['lat'],
+                                          'longitude': gmaps.geocode(depot_address_routes)[0]['geometry']['location']['lng']},
+                        'semi_depot_addresses': semi_depot_with_coords,
+                        'addresses': addresses_with_coords,
                         'priorities': priorities_routes,
                         'days': days_routes,
                         'distance_limit': distance_limit_routes,
@@ -550,9 +589,22 @@ class RouteRepository():
             return document
         if locations is not None and routes is not None:
             unique_addresses, unique_priorities = self.remove_duplicated_addresses(addresses_locations, addresses_routes, priorities_locations, priorities_routes)
-            document = {'depot_address': depot_address_locations,
-                        'semi_depot_addresses': list(np.unique(semi_depot_locations + semi_depot_routes)),
-                        'addresses': unique_addresses,
+
+            if len(list(np.unique(semi_depot_locations + semi_depot_routes))) != 0:
+                semi_depot_with_coords = self.add_coords_to_addresses(list(np.unique(semi_depot_locations + semi_depot_routes)))
+            else:
+                semi_depot_with_coords = []
+
+            if len(unique_addresses) != 0:
+                addresses_with_coords = self.add_coords_to_addresses(unique_addresses)
+            else:
+                addresses_with_coords = []
+
+            document = {'depot_address': {'name': depot_address_locations,
+                                          'latitude': gmaps.geocode(depot_address_locations)[0]['geometry']['location']['lat'],
+                                          'longitude': gmaps.geocode(depot_address_locations)[0]['geometry']['location']['lng']},
+                        'semi_depot_addresses': semi_depot_with_coords,
+                        'addresses': addresses_with_coords,
                         'priorities': unique_priorities,
                         'days': days_locations,
                         'distance_limit': distance_limit_locations,
@@ -561,6 +613,14 @@ class RouteRepository():
                         'avoid_tolls': avoid_tolls_locations,
                         'routes_id': routes_id}
             return document
+
+    def add_coords_to_addresses(self, addresses):
+        addresses_with_coords = []
+        for address in addresses:
+            addresses_with_coords.append({'name': address,
+                                          'latitude': gmaps.geocode(address)[0]['geometry']['location']['lat'],
+                                          'longitude': gmaps.geocode(address)[0]['geometry']['location']['lng']})
+        return addresses_with_coords
 
     def remove_duplicated_addresses(self, addresses_locations, addresses_routes, priorities_locations, priorities_routes):
         address_priority_mapping = dict(zip(addresses_locations + addresses_routes, priorities_locations + priorities_routes))
