@@ -10,7 +10,7 @@ from pymongo.results import InsertOneResult
 from fastapi import HTTPException
 import googlemaps
 
-import datetime
+from datetime import datetime
 import numpy as np
 from dateutil.parser import parse
 
@@ -705,8 +705,8 @@ class RouteRepository():
                             sum_distance = sum_distance + value_in['distance_km']
                             sum_duration = sum_duration + value_in['duration_hours']
                             sum_fuel = sum_fuel + value_in['fuel_liters']
-                            data_obj = parse(value_in['date_of_completion'])
-                            day_of_week = data_obj.strftime("%A")
+                            data_obj = datetime.strptime(value_in['date_of_completion'], '%d.%m.%Y, %H:%M')
+                            day_of_week = data_obj.strftime('%A')
                             sum_days_of_week[day_of_week] = sum_days_of_week[day_of_week] + 1
                             for location in value_in['coords']:
                                 if location['visited'] is True and location['isDepot'] is False:
