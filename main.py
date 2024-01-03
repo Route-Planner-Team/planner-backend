@@ -303,7 +303,8 @@ def change_name_of_routes(request: Request, rename: RenameModel):
     if uid is None:
         raise NotAuthenticated('User ID not found in token')
     try:
-        status = routes_repo.change_routes_name(rename.routes_id,
+        status = routes_repo.change_routes_name(uid,
+                                                rename.routes_id,
                                                 rename.name)
         return status
     except HTTPException as e:
