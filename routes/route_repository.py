@@ -794,3 +794,26 @@ class RouteRepository():
             "name": name
         }
 
+    def get_waypoint_info(self, routes_id,  route_number):
+        routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
+        if routes is None:
+            raise HTTPException(status_code=404, detail="Routes not found")
+        locations = routes[str(route_number)]['coords']
+        info = []
+        for location in locations:
+            info.append({'name': location['name'], 'visited': location['visited']})
+        return info
+
+
+
+
+
+
+
+
+
+
+
+
+
+

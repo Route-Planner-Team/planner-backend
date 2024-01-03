@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from loguru import logger
 
 from config import Config
-from routes.model import RoutesModel, WaypointModel, RegenerateModel, StatisticModel, RenameModel
+from routes.model import RoutesModel, WaypointModel, RegenerateModel, StatisticModel, RenameModel, WaypointInfoModel
 from routes.planner import RoutesPlanner
 from routes.route_repository import RouteRepository
 from users.auth import authenticate_header
@@ -230,6 +230,23 @@ def active_routes_handler(request: Request):
         return {'message': 'No active routes for that user'}
 
     return res
+
+@app.get("/routes/waypoint/info")
+@logger.catch
+def route_waypoint_info(request: Request, waypoint: WaypointInfoModel):
+    uid = request.state.uid
+    if uid is None:
+        raise NotAuthenticated('User ID not found in token')
+
+    try:
+        waypoint_info = routes_repo.get_waypoint_info(waypoint.routes_id,
+                                                      waypoint.route_number)
+        return waypoint_info
+    except ValueError as e:
+        error = str(e)
+        return JSONResponse(status_code=400, content={"error": error})
+    except KeyError as e:
+        return JSONResponse(status_code=400, content={"error": "Route with that number not found"})
 
 
 @app.post("/routes")

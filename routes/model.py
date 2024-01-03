@@ -28,3 +28,7 @@ class StatisticModel(BaseModel):
 class RenameModel(BaseModel):
     routes_id: str = Field(..., description="Collection of routes for which we want to change name")
     name: str = Field(..., description="New name for routes")
+
+class WaypointInfoModel(BaseModel):
+    routes_id: str = Field(..., description="Database id of a set of routes, generated together")
+    route_number: int = Field(..., description="Id of a single route in a set")
