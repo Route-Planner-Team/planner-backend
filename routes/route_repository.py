@@ -60,7 +60,7 @@ class RouteRepository():
         document['avoid_tolls'] = avoid_tolls
         document['routes_completed'] = False
         document['date_of_completion'] = None
-        current_datetime = datetime.datetime.now()
+        current_datetime = datetime.now()
         document['generation_date'] = f'{current_datetime.day:02d}.{current_datetime.month:02d}.{current_datetime.year}, {current_datetime.hour:02d}:{current_datetime.minute:02d}'
         document['name'] = f'{current_datetime.day:02d}.{current_datetime.month:02d}.{current_datetime.year}, {current_datetime.hour:02d}:{current_datetime.minute:02d}' #date as default
 
@@ -377,7 +377,7 @@ class RouteRepository():
         # Check if in all location there is True or False value
         all_visited = all(item['visited'] in [True, False] for item in route[0][1]['coords'])
         route[0][1]['completed'] = all_visited
-        current_datetime = datetime.datetime.now()
+        current_datetime = datetime.now()
         if route[0][1]['completed'] is True:
             route[0][1]['date_of_completion'] = f'{current_datetime.day:02d}.{current_datetime.month:02d}.{current_datetime.year}, {current_datetime.hour:02d}:{current_datetime.minute:02d}'
             real_distance, real_duration, real_polyline, real_fuel = self.get_real_stats(route[0][1]['coords'], avoid_tolls)
