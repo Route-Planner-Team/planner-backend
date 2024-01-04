@@ -231,7 +231,7 @@ def active_routes_handler(request: Request):
 
     return res
 
-@app.get("/routes/waypoint/info")
+@app.post("/routes/waypoint/info")
 @logger.catch
 def route_waypoint_info(request: Request, waypoint: WaypointInfoModel):
     uid = request.state.uid
