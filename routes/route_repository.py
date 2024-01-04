@@ -80,6 +80,11 @@ class RouteRepository():
                 self.locations_collection.delete_many({"routes_id": routes_id})
                 document['routes_id'] = str(routes_id)
                 transformed_document = self.transform_format(document, False)
+                active_routes = []
+                for route in transformed_document['routes'][0]['subRoutes']:
+                    if route['completed'] is False:
+                        active_routes.append(route)
+                transformed_document['routes'][0]['subRoutes'] = active_routes
                 return transformed_document
 
         res = self.routes_collection.insert_one(dict(document))
