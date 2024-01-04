@@ -780,16 +780,40 @@ class RouteRepository():
 
         return result
 
-    def change_routes_name(self, routes_id, name):
+    def change_routes_name(self, uid, routes_id, name):
         routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
         if routes is None:
             raise HTTPException(status_code=404, detail="Routes not found")
-        routes_name = self.routes_collection.find_one({"name": name})
-        if routes_name is not None:
-            raise HTTPException(status_code=404, detail="Routes with that name already exists")
+        user_routes = self.routes_collection.find({"user_firebase_id": uid})
+        for route in user_routes:
+            if route['name'] == name:
+                raise HTTPException(status_code=404, detail="Routes with that name already exists")
         self.routes_collection.update_one({'_id': ObjectId(routes_id)}, {'$set': {'name': name}})
         return {
             "routes_id": str(routes['_id']),
             "name": name
         }
+
+    def get_waypoint_info(self, routes_id,  route_number):
+        routes = self.routes_collection.find_one({"_id": ObjectId(routes_id)})
+        if routes is None:
+            raise HTTPException(status_code=404, detail="Routes not found")
+        locations = routes[str(route_number)]['coords']
+        info = []
+        for location in locations:
+            info.append({'name': location['name'], 'visited': location['visited']})
+        return info
+
+
+
+
+
+
+
+
+
+
+
+
+
 
